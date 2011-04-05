@@ -1,0 +1,1 @@
+This application was written to run on a very low power solid state Linux machine. This Linux machine has little or no disk space. Serial data will arrive at random intervals and the daemon will pick it up and hash that data into a hash table and retrieve an answer to respond to the serial data.
