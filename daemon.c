@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/signal.h>
 #include <sys/types.h>
+#include <pty.h>
 
 #define TABLESIZE 5000
 #define DBLINESIZE 16
@@ -20,7 +21,6 @@
 #define FALSE 0
 #define TRUE 1
 #define TESTING 1
-
 
 struct simple_rfid_access {
   char cardnum[16];
@@ -70,6 +70,9 @@ clear() {
 
 int
 load(int argc, char **argv) {
+  
+  
+  
   #ifdef TESTING
   /* for testing only */
   int i;
@@ -82,12 +85,14 @@ load(int argc, char **argv) {
     if(db[h].cardnum) {
       db[h].next = &rfiddb;
     }
-    /* end test */
     else {
       db[h] = rfiddb;
     }
     printf("hash of %s: %i\n", rfiddb.cardnum, hash(rfiddb.cardnum));
   }    
+  /* end test */
+  
+  
   #else
   FILE *fp;
   char *p;
@@ -112,7 +117,16 @@ int
 main(int argc, char **argv) {
   // clear();
   // load(argc, argv);
-  // return 1;
+  int am, as, res;
+  char n[20];
+  const struct termios t;
+  const struct winsize w;
+  res = openpty(&am, &as, n, &t, &w);
+  printf("result of openpty: %i\n\n", res);
+  printf("master's file descriptor is: %i\n\n", am);
+  printf("slave's file descriptor is: %i\n\n", as);
+  return 1;
+  
   struct termios newtio;
   struct sigaction saio;
   pid_t pid, sid;
