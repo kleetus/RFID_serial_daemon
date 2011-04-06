@@ -2,8 +2,9 @@ CC=gcc
 CFLAGS=-I.
 LIBS=-lutil
 
-daemon: daemon.c
+default: daemon.c
 	$(CC) -o daemon daemon.c $(CFLAGS) $(LIBS)
+	$(CC) -o testinput testinput.c $(CFLAGS) $(LIBS)
 
 clean:
-	rm -rf daemon
+	rm -rf daemon testinput
