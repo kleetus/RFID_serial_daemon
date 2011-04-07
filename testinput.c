@@ -20,7 +20,7 @@
 #define BAUDRATE B9600
 
 char *db[TABLESIZE];
-
+int exitcondition = 0;
 
 int readindb() {
 	FILE *fp;
@@ -55,13 +55,13 @@ main() {
 	FILE *fpipe;
 	int am, as, res;
   char n[100];
-	char command[100];
   char line[256];
   const struct termios t;
   const struct winsize w;
+	pid_t pid;
 	
 	readindb();
-	
+
   res = openpty(&am, &as, n, &t, &w);
 	if(res<-1){
   	exit(1);
@@ -69,14 +69,52 @@ main() {
 	
 	//TODO: add checking for a running daemon and stop it, then restart it under known testing conditions
 	//for now consider that the user has shutdown the daemon prior to starting this script
-	sprintf(command, "./daemon %s /var/db/db.txt", n);
 
-  if(!(fpipe = (FILE*)popen(command,"r"))){ 
-	  perror("Problems with pipe");
-	  exit(1);
-  }
-  while ( fgets( line, sizeof line, fpipe)){
-    printf("%s", line);
-  }
- 	pclose(fpipe);
+
+
+	/* get the process id */
+	// if ((pid = getpid()) < 0) {
+	//   perror("unable to get pid\n\n");
+	// } 
+	// else {
+	//   printf("The process id is %d\n\n", pid);
+	// }
+	// 
+	// /* get the parent process id */
+	// if ((ppid = getppid()) < 0) {
+	//   perror("unable to get the ppid\n\n");
+	// } 
+	// else {printf("The parent process id is %d\n\n", ppid);}
+	// 
+	// /* get the group process id */
+	// if ((gid = getgid()) < 0) {
+	//   perror("unable to get the group id\n\n");
+	// } 
+	// else {printf("The group id is %d\n\n", gid);
+	// }
+	// return 0;
+	// pid = getpid();
+	pid_t thispid = fork();
+
+
+	if(thispid != 0) {
+		//we're in the forked process
+		char *args[] = {'\0'};
+		execv("./daemon", args);
+		exitcondition = 1; //will never get here
+	}
+	else {
+		while(exitcondition == 0) {
+			usleep(1000000);
+		}
+	}
+ 
+ // if(!(fpipe = (FILE*)popen(command,"r"))){ 
+  // 	  perror("Problems with pipe");
+  // 	  exit(1);
+  //  }
+  //  while ( fgets( line, sizeof line, fpipe)){
+  //    printf("%s", line);
+  //  }
+  // 	pclose(fpipe);
 }

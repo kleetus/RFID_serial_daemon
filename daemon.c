@@ -123,6 +123,7 @@ main(int argc, char **argv) {
   // clear();
   // load(argc, argv);
 	printf("\n\n\n\nthis ran!\n\n\n\n");
+	exit(1);
   // struct termios newtio;
   // struct sigaction saio;
   // pid_t pid, sid;
