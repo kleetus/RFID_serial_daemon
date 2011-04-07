@@ -35,7 +35,6 @@ int readindb() {
 		if(*b == '\n') continue;
 		db[i] = b;
 		i++;
-		printf("%i. %s\n", i, b);
 	}
 	fclose(fp);
 	return 1;
@@ -44,17 +43,40 @@ int readindb() {
 /*
 This is a test script that randomly sends input to the main rfid serial daemon to see how it 
 reacts under somewhat realistic loads -- very small loads more than likely
+
+This script will open a master/slave pty pair and attach itself to the master end of the communications line. 
+It will expect the application under test (the daemon) to attach itself to the slave
+Example: the master/slave pair created, the exposed device in linux will be the slave device of /dev/pts/0. This is the device name that
+the daemon app will be called with. So this app can write and read from its master file descriptor and the daemon will write and read from the slave device
+(/dev/pts/0).
 */
 int
 main() {
+	FILE *fpipe;
 	int am, as, res;
   char n[100];
+	char command[100];
+  char line[256];
   const struct termios t;
   const struct winsize w;
-	char random_array[100];
+	
 	readindb();
+	
   res = openpty(&am, &as, n, &t, &w);
-	if(!res){
-		return -1;
+	if(res<-1){
+  	exit(1);
 	}
+	
+	//TODO: add checking for a running daemon and stop it, then restart it under known testing conditions
+	//for now consider that the user has shutdown the daemon prior to starting this script
+	sprintf(command, "./daemon %s /var/db/db.txt", n);
+
+  if(!(fpipe = (FILE*)popen(command,"r"))){ 
+	  perror("Problems with pipe");
+	  exit(1);
+  }
+  while ( fgets( line, sizeof line, fpipe)){
+    printf("%s", line);
+  }
+ 	pclose(fpipe);
 }

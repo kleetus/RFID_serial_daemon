@@ -16,7 +16,6 @@
 #define TABLESIZE 5000
 #define DBLINESIZE 16
 #define BAUDRATE B9600
-#define DEVICE "/dev/ttyS0"
 #define _POSIX_SOURCE 1
 #define FALSE 0
 #define TRUE 1
@@ -33,6 +32,7 @@ struct simple_rfid_access db[TABLESIZE];
 char buf[DBLINESIZE];
 char *ans;
 int fd;
+char *device;
 
 unsigned int
 hash(char *ch) {
@@ -72,7 +72,6 @@ int
 load(int argc, char **argv) {
   
   
-  
   #ifdef TESTING
   /* for testing only */
   int i;
@@ -97,8 +96,14 @@ load(int argc, char **argv) {
   FILE *fp;
   char *p;
   char buf[DBLINESIZE];
-  if(argc>1) fp = fopen(argv[1], "r");
-  else fp = fopen("/var/db/db.txt", "r");
+  if(argc>2) {
+		fp = fopen(argv[2], "r");
+		device = argv[1];
+	}
+  else {
+		fp = fopen("/var/db/db.txt", "r");
+		device = "/dev/ttyS0";
+	} 
   if(fp == NULL) {
     printf("failed to open database.\n");
     return -1;
@@ -117,62 +122,53 @@ int
 main(int argc, char **argv) {
   // clear();
   // load(argc, argv);
-  int am, as, res;
-  char n[20];
-  const struct termios t;
-  const struct winsize w;
-  res = openpty(&am, &as, n, &t, &w);
-  printf("result of openpty: %i\n\n", res);
-  printf("master's file descriptor is: %i\n\n", am);
-  printf("slave's file descriptor is: %i\n\n", as);
-  return 1;
-  
-  struct termios newtio;
-  struct sigaction saio;
-  pid_t pid, sid;
-  sigset_t st;
-   
-  pid = fork();
-   
-  if(pid < 0) exit(EXIT_FAILURE);
-  if(pid > 0) exit(EXIT_SUCCESS);
-   
-  umask(0);
-   
-  sid = setsid();
-  if (sid < 0) exit(EXIT_FAILURE);
-  if((chdir("/")) < 0) exit(EXIT_FAILURE);
-   
-  close(STDIN_FILENO); close(STDOUT_FILENO); close(STDERR_FILENO);
-   
-  /* open the device to be non-blocking (read will return immediately) */
-  fd = open(DEVICE, O_RDWR | O_NOCTTY | O_NONBLOCK);
-  if(fd<0) {perror(DEVICE); exit(-1);}
-  
-  /* install the signal handler before making the device asynchronous */
-  saio.sa_handler = signal_handler_IO;
-  saio.sa_mask = st;
-  saio.sa_flags = 0;
-  saio.sa_restorer = NULL;
-  sigaction(SIGIO,&saio,NULL);
-  
-  /* allow the process to receive SIGIO */
-  fcntl(fd, F_SETOWN, getpid());
-  fcntl(fd, F_SETFL, FASYNC);
-  
-  /* set new port settings for canonical input processing */
-  newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;
-  newtio.c_iflag = IGNPAR | ICRNL;
-  newtio.c_oflag = 0;
-  newtio.c_lflag = ICANON;
-  newtio.c_cc[VMIN]=1;
-  newtio.c_cc[VTIME]=0;
-  tcflush(fd, TCIFLUSH);
-  tcsetattr(fd,TCSANOW,&newtio);
-  
-  while (1) {
-    usleep(1000000);
-  }
-   
-  exit(EXIT_SUCCESS);
+	printf("\n\n\n\nthis ran!\n\n\n\n");
+  // struct termios newtio;
+  // struct sigaction saio;
+  // pid_t pid, sid;
+  // sigset_t st;
+  //  
+  // pid = fork();
+  //  
+  // if(pid < 0) exit(EXIT_FAILURE);
+  // if(pid > 0) exit(EXIT_SUCCESS);
+  //  
+  // umask(0);
+  //  
+  // sid = setsid();
+  // if (sid < 0) exit(EXIT_FAILURE);
+  // if((chdir("/")) < 0) exit(EXIT_FAILURE);
+  //  
+  // close(STDIN_FILENO); close(STDOUT_FILENO); close(STDERR_FILENO);
+  //  
+  // /* open the device to be non-blocking (read will return immediately) */
+  // fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+  // if(fd<0) {perror(device); exit(-1);}
+  // 
+  // /* install the signal handler before making the device asynchronous */
+  // saio.sa_handler = signal_handler_IO;
+  // saio.sa_mask = st;
+  // saio.sa_flags = 0;
+  // saio.sa_restorer = NULL;
+  // sigaction(SIGIO,&saio,NULL);
+  // 
+  // /* allow the process to receive SIGIO */
+  // fcntl(fd, F_SETOWN, getpid());
+  // fcntl(fd, F_SETFL, FASYNC);
+  // 
+  // /* set new port settings for canonical input processing */
+  // newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;
+  // newtio.c_iflag = IGNPAR | ICRNL;
+  // newtio.c_oflag = 0;
+  // newtio.c_lflag = ICANON;
+  // newtio.c_cc[VMIN]=1;
+  // newtio.c_cc[VTIME]=0;
+  // tcflush(fd, TCIFLUSH);
+  // tcsetattr(fd,TCSANOW,&newtio);
+  // 
+  // while (1) {
+  //   usleep(1000000);
+  // }
+  //  
+  // exit(EXIT_SUCCESS);
 }
