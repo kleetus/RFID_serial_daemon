@@ -19,8 +19,7 @@
 #define DBLINESIZE 9
 #define BAUDRATE B9600
 
-char *db[TABLESIZE];
-int exitcondition = 0;
+char db[TABLESIZE][DBLINESIZE];
 
 int readindb() {
 	FILE *fp;
@@ -33,7 +32,7 @@ int readindb() {
   }  
 	while(fgets(b, sizeof(b), fp)) {
 		if(*b == '\n') continue;
-		db[i] = b;
+		strncpy(db[i], b, DBLINESIZE);
 		i++;
 	}
 	fclose(fp);
@@ -53,7 +52,7 @@ the daemon app will be called with. So this app can write and read from its mast
 int
 main() {
 	FILE *fpipe;
-	int am, as, res;
+	int am, as, res, i;
   char n[100];
   char line[256];
   const struct termios t;
@@ -61,9 +60,9 @@ main() {
 	pid_t pid;
 	
 	readindb();
-
+	
   res = openpty(&am, &as, n, &t, &w);
-	if(res<-1){
+	if(res<0){
   	exit(1);
 	}
 	
@@ -94,20 +93,22 @@ main() {
 	// }
 	// return 0;
 	// pid = getpid();
-	pid_t thispid = fork();
 
+	pid = fork();
 
-	if(thispid != 0) {
-		//we're in the forked process
-		char *args[] = {'\0'};
-		execv("./daemon", args);
-		exitcondition = 1; //will never get here
-	}
-	else {
-		while(exitcondition == 0) {
-			usleep(1000000);
+  if(pid < 0) exit(EXIT_FAILURE);
+  if(pid > 0) exit(EXIT_SUCCESS);
+   
+
+	// if(thispid != 0) {
+	// 	char *args[] = {'\0'};
+	// 	execv("./daemon", args);
+	// }
+	//else {
+		for(i=0; i<TABLESIZE; i++){
+			printf("%s\n", db[i]);
 		}
-	}
+	//}
  
  // if(!(fpipe = (FILE*)popen(command,"r"))){ 
   // 	  perror("Problems with pipe");
