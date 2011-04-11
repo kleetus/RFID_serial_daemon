@@ -21,6 +21,13 @@
 
 char db[TABLESIZE][DBLINESIZE];
 
+int initdb() {
+	int i;
+	for(i=0; i<TABLESIZE; i++) {
+		strncpy(db[i], "", DBLINESIZE);	
+	}
+}
+
 int readindb() {
 	FILE *fp;
 	char b[DBLINESIZE];
@@ -51,7 +58,6 @@ the daemon app will be called with. So this app can write and read from its mast
 */
 int
 main() {
-	FILE *fpipe;
 	int am, as, res, i;
   char n[100];
   char line[256];
@@ -59,6 +65,7 @@ main() {
   const struct winsize w;
 	pid_t pid;
 	
+	initdb();
 	readindb();
 	
   res = openpty(&am, &as, n, &t, &w);
@@ -66,56 +73,23 @@ main() {
   	exit(1);
 	}
 	
-	//TODO: add checking for a running daemon and stop it, then restart it under known testing conditions
-	//for now consider that the user has shutdown the daemon prior to starting this script
-
-
-
-	/* get the process id */
-	// if ((pid = getpid()) < 0) {
-	//   perror("unable to get pid\n\n");
-	// } 
-	// else {
-	//   printf("The process id is %d\n\n", pid);
-	// }
-	// 
-	// /* get the parent process id */
-	// if ((ppid = getppid()) < 0) {
-	//   perror("unable to get the ppid\n\n");
-	// } 
-	// else {printf("The parent process id is %d\n\n", ppid);}
-	// 
-	// /* get the group process id */
-	// if ((gid = getgid()) < 0) {
-	//   perror("unable to get the group id\n\n");
-	// } 
-	// else {printf("The group id is %d\n\n", gid);
-	// }
-	// return 0;
-	// pid = getpid();
-
 	pid = fork();
 
-  if(pid < 0) exit(EXIT_FAILURE);
-  if(pid > 0) exit(EXIT_SUCCESS);
-   
+  if(pid < 0) exit(EXIT_FAILURE); //means we are in the parent's thread and the fork failed
 
-	// if(thispid != 0) {
-	// 	char *args[] = {'\0'};
-	// 	execv("./daemon", args);
-	// }
-	//else {
-		for(i=0; i<TABLESIZE; i++){
-			printf("%s\n", db[i]);
+	if(pid == 0) {
+		char *args[] = {'\0'};
+		execv("./daemon", args); //this replaces the child process' pid, so the child process of this app/script is the daemon
+	}
+	else {
+		while(1){
+			for(i=0; i<TABLESIZE; i++) {
+				if(db[i][0] != '\0') {
+					printf("sending:	%s\n", db[i]);
+					printf("receiving:	%s\n", db[i]);
+					usleep(100000);
+				}
+			}
 		}
-	//}
- 
- // if(!(fpipe = (FILE*)popen(command,"r"))){ 
-  // 	  perror("Problems with pipe");
-  // 	  exit(1);
-  //  }
-  //  while ( fgets( line, sizeof line, fpipe)){
-  //    printf("%s", line);
-  //  }
-  // 	pclose(fpipe);
+	} 
 }
