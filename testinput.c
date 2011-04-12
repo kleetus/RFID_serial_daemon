@@ -72,7 +72,7 @@ main() {
   const struct termios t;
 	const struct winsize w;
 	pid_t pid;
-	char received[DBLINESIZE];
+	char received[2];
 	
 	(void) signal(SIGINT, cleanup);
 	
@@ -101,10 +101,10 @@ main() {
 				if(db[i][0] != '\0'){
 					printf("sending:	%s\n", db[i]);
 					write(am, db[i], strlen(db[i]));
-					write(am, "\n", 1);
-					read(am, received, DBLINESIZE);
+					write(am, "\n", 1); //this means "do it"
+					read(am, received, 1);
 					printf("receiving:	%s\n", received);
-					usleep(1000000);
+					usleep(100000);
 				}
 			}
 		}

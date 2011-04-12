@@ -53,17 +53,19 @@ signal_handler_IO(int status) {
 	char buf[256];
 	char logbuf[256];
 	int c, h;
+	char ans;
 	memset(logbuf, '\0', sizeof(logbuf));
 	memset(buf, '\0', sizeof(buf));
   c = read(fd, buf, DBLINESIZE);
 	buf[strlen(buf)-1] = '\0';
-	sprintf(logbuf, "IO HANDLER -- received: %s", buf);
-  logdaemonevent(logbuf);
+	ans = buf[strlen(buf)-1];
+	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", buf, ans);
+	logdaemonevent(logbuf);
   if(h=hash(buf) > TABLESIZE) {
     write(fd, "ERROR", 5);
     return;
   } 
-  write(fd, buf, strlen(buf));
+  write(fd, &ans, 1);
 }
 
 void
