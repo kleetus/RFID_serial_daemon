@@ -46,6 +46,14 @@ int readindb() {
 	return 1;
 }
 
+void cleanup(int sig) {
+	if(sig == 2) {
+		system("killall daemon");
+	}
+	(void) signal(SIGINT, SIG_DFL);
+}
+
+
 /*
 This is a test script that randomly sends input to the main rfid serial daemon to see how it 
 reacts under somewhat realistic loads -- very small loads more than likely
@@ -62,8 +70,11 @@ main() {
   char n[100];
   char line[256];
   const struct termios t;
-  const struct winsize w;
+	const struct winsize w;
 	pid_t pid;
+	char received[DBLINESIZE];
+	
+	(void) signal(SIGINT, cleanup);
 	
 	initdb();
 	readindb();
@@ -73,21 +84,27 @@ main() {
   	exit(1);
 	}
 	
+	grantpt(am);
+	unlockpt(am);
+	
 	pid = fork();
 
-  if(pid < 0) exit(EXIT_FAILURE); //means we are in the parent's thread and the fork failed
+  if(pid < 0) exit(EXIT_FAILURE); //means we are in the parent's thread (still) and the fork failed
 
 	if(pid == 0) {
-		char *args[] = {'\0'};
+		char *args[] = {"./daemon", n, "/var/db/db.txt", NULL};
 		execv("./daemon", args); //this replaces the child process' pid, so the child process of this app/script is the daemon
 	}
 	else {
 		while(1){
-			for(i=0; i<TABLESIZE; i++) {
-				if(db[i][0] != '\0') {
+			for(i=0; i<TABLESIZE; i++){
+				if(db[i][0] != '\0'){
 					printf("sending:	%s\n", db[i]);
-					printf("receiving:	%s\n", db[i]);
-					usleep(100000);
+					write(am, db[i], strlen(db[i]));
+					write(am, "\n", 1);
+					read(am, received, DBLINESIZE);
+					printf("receiving:	%s\n", received);
+					usleep(1000000);
 				}
 			}
 		}

@@ -12,6 +12,7 @@
 #include <sys/signal.h>
 #include <sys/types.h>
 #include <pty.h>
+#include <time.h>
 
 #define TABLESIZE 5000
 #define DBLINESIZE 9
@@ -19,6 +20,7 @@
 #define _POSIX_SOURCE 1
 #define FALSE 0
 #define TRUE 1
+#define VERSION "0.1"
 //#define TESTING 1
 
 struct simple_rfid_access {
@@ -31,8 +33,9 @@ void signal_handler_IO(int status);
 struct simple_rfid_access db[TABLESIZE];
 char buf[DBLINESIZE];
 char *ans;
-int fd;
 char *device;
+int fd, logp;
+char *version = VERSION;
 
 unsigned int
 hash(char *ch) {
@@ -47,16 +50,20 @@ hash(char *ch) {
 
 void
 signal_handler_IO(int status) {
-  int c, h;
-  char a = '0';
+	char buf[256];
+	char logbuf[256];
+	int c, h;
+	memset(logbuf, '\0', sizeof(logbuf));
+	memset(buf, '\0', sizeof(buf));
   c = read(fd, buf, DBLINESIZE);
+	buf[strlen(buf)-1] = '\0';
+	sprintf(logbuf, "IO HANDLER -- received: %s", buf);
+  logdaemonevent(logbuf);
   if(h=hash(buf) > TABLESIZE) {
-    write(fd, &a, 1);
+    write(fd, "ERROR", 5);
     return;
   } 
-  ans = &(db[hash(buf)].hashval);
-  write(fd, ans, 1);
-  //clear out the buffer for the next time??  
+  write(fd, buf, strlen(buf));
 }
 
 void
@@ -77,19 +84,21 @@ load(int argc, char **argv) {
   #ifdef TESTING
   /* for testing only */
   int i,h;
-  for(i=1; i<501; i++) {
+  for(i=1; i<5000; i++) {
     struct simple_rfid_access rfiddb;
 		h = 0;
-    sprintf(rfiddb.cardnum, "%i", i);
-    h = hash(rfiddb.cardnum);
+		char n[5];
+		sprintf(n, "%i", i);
+		rfiddb.cardnum = n;
+		h = hash(rfiddb.cardnum);
     rfiddb.hashval = '1'; //just hardcoded to 'yes'
-    if(db[h].cardnum) {
+    if(db[h].cardnum != "") {
       db[h].next = &rfiddb;
     }
     else {
       db[h] = rfiddb;
     }
-  }    
+	}
   /* end test */
   
   
@@ -108,7 +117,7 @@ load(int argc, char **argv) {
 	} 
   if(fp == NULL) {
     printf("failed to open database.\n");
-    return -1;
+		exit(EXIT_FAILURE);
   }
   while(fgets(buf, sizeof(buf), fp)) {
 		if(*buf == '\n') continue;
@@ -131,31 +140,69 @@ load(int argc, char **argv) {
 }
 
 int
+opendaemonlog() {
+	logp = open("/var/log/rfid_daemon.log", O_RDWR | O_APPEND);
+	if(logp < 0) { 
+		printf("failed to open log file: /var/log/rfid_daemon.log");
+		exit(EXIT_FAILURE);
+	}
+	return 1;
+}
+
+int closedaemonlog() {
+	close(logp);
+	return 1;
+}
+
+int
+logdaemonevent(char *event) {
+	char log[256];
+	log[0] = '\0';
+	time_t t = time(NULL);
+	char *logtime = ctime(&t);
+	logtime[strlen(logtime)-1] = ' ';
+	logtime[strlen(logtime)] = '\0';
+	strcat(log, logtime);
+	strcat(log, event);
+	strcat(log, "\n");
+	write(logp, log, strlen(log));
+	return 1;
+}
+
+int
 main(int argc, char **argv) {
   struct termios newtio;
   struct sigaction saio;
   pid_t pid, sid;
   sigset_t st;
 
+	char logentry[256];
+	
+	opendaemonlog(); //this could make the app fail if there is no log file, watch stdout
+	
   clear();
   load(argc, argv);
+
+	sprintf(logentry, "Starting rfid serial daemon, version %s", version);
+	logdaemonevent(logentry);
    
   pid = fork();
    
-  if(pid < 0) exit(EXIT_FAILURE);
-  if(pid > 0) exit(EXIT_SUCCESS);
-   
+	if(pid < 0) {	logdaemonevent("failed to fork process."); exit(EXIT_FAILURE); }
+  if(pid > 0) {	logdaemonevent("forked process."); exit(EXIT_SUCCESS); }
+  
   umask(0);
    
   sid = setsid();
-  if (sid < 0) exit(EXIT_FAILURE);
-  if((chdir("/")) < 0) exit(EXIT_FAILURE);
+  if (sid < 0) { logdaemonevent("sid less than 0."); exit(EXIT_FAILURE);}
+  if((chdir("/")) < 0) { logdaemonevent("could not chdir to /."); exit(EXIT_FAILURE);}
    
   close(STDIN_FILENO); close(STDOUT_FILENO); close(STDERR_FILENO);
    
   /* open the device to be non-blocking (read will return immediately) */
+	logdaemonevent(device);
   fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-  if(fd<0) {perror(device); exit(-1);}
+  if(fd<0) { logdaemonevent("failed to open serial device."); perror(device); exit(EXIT_FAILURE); }
   
   /* install the signal handler before making the device asynchronous */
   saio.sa_handler = signal_handler_IO;
@@ -165,6 +212,10 @@ main(int argc, char **argv) {
   sigaction(SIGIO,&saio,NULL);
   
   /* allow the process to receive SIGIO */
+	char buff[10];
+	sprintf(buff, "pid of event handler: %i", getpid());
+	logdaemonevent(buff);
+	
   fcntl(fd, F_SETOWN, getpid());
   fcntl(fd, F_SETFL, FASYNC);
   
@@ -179,7 +230,10 @@ main(int argc, char **argv) {
   tcsetattr(fd,TCSANOW,&newtio);
   
   while (1) {
-    usleep(1000000);
+    usleep(100000);
   }   
+
+	closedaemonlog();
+	
   exit(EXIT_SUCCESS);
 }
