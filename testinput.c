@@ -16,10 +16,11 @@
 
 
 #define TABLESIZE 5000
-#define DBLINESIZE 9
+#define DBLINESIZE 10
 #define BAUDRATE B9600
 
 char db[TABLESIZE][DBLINESIZE];
+char answers[TABLESIZE];
 
 int initdb() {
 	int i;
@@ -40,6 +41,8 @@ int readindb() {
 	while(fgets(b, sizeof(b), fp)) {
 		if(*b == '\n') continue;
 		strncpy(db[i], b, DBLINESIZE);
+		answers[i] = db[i][strlen(db[i])-1];
+		db[i][strlen(db[i])-1] = '\0';
 		i++;
 	}
 	fclose(fp);
@@ -73,6 +76,8 @@ main() {
 	const struct winsize w;
 	pid_t pid;
 	char received[2];
+	char ans;
+	char cmp[2];
 	
 	(void) signal(SIGINT, cleanup);
 	
@@ -81,6 +86,7 @@ main() {
 	
   res = openpty(&am, &as, n, &t, &w);
 	if(res<0){
+		printf("couldn't open the pty, so quitting.\n\n");
   	exit(1);
 	}
 	
@@ -89,7 +95,7 @@ main() {
 	
 	pid = fork();
 
-  if(pid < 0) exit(EXIT_FAILURE); //means we are in the parent's thread (still) and the fork failed
+	if(pid < 0) { printf("could not fork a process, so quitting.\n\n"); exit(EXIT_FAILURE); }//means we are in the parent's thread (still) and the fork failed
 
 	if(pid == 0) {
 		char *args[] = {"./daemon", n, "/var/db/db.txt", NULL};
@@ -104,6 +110,10 @@ main() {
 					write(am, "\n", 1); //this means "do it"
 					read(am, received, 1);
 					printf("receiving:	%s\n", received);
+					sprintf(cmp, "%c", ans);
+					if(strcmp(received, cmp) != 0) {
+						printf("should of received:	%s\n", cmp);
+					}
 					usleep(100000);
 				}
 			}

@@ -52,20 +52,39 @@ void
 signal_handler_IO(int status) {
 	char buf[256];
 	char logbuf[256];
-	int c, h;
-	char ans;
+	int h;
+	char ans = '0';
 	memset(logbuf, '\0', sizeof(logbuf));
 	memset(buf, '\0', sizeof(buf));
-  c = read(fd, buf, DBLINESIZE);
+  if(read(fd, buf, DBLINESIZE) < DBLINESIZE) {
+		ans = '3';
+		goto error_condition;
+	}
 	buf[strlen(buf)-1] = '\0';
-	ans = buf[strlen(buf)-1];
+	h=hash(buf);
+  if(h > TABLESIZE) {
+		ans = '4';
+		goto error_condition;
+  }
+	//actually look up the answer now
+	struct simple_rfid_access rf = db[h];
+	// char t[10];
+	// sprintf(t, "%i", h);
+	//logdaemonevent(db[h].cardnum);
+	while(1) {
+		if(strcmp(rf.cardnum,buf) == 0) { ans = db[h].hashval; break; }
+		else if(rf.next != NULL) {
+			rf = *(rf.next);
+		}
+		else {
+			ans = '5';
+			break;
+		}
+	}
+error_condition:
 	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", buf, ans);
 	logdaemonevent(logbuf);
-  if(h=hash(buf) > TABLESIZE) {
-    write(fd, "ERROR", 5);
-    return;
-  } 
-  write(fd, &ans, 1);
+	write(fd, &ans, 1);
 }
 
 void
@@ -74,6 +93,7 @@ clear() {
   int i;
 	rfiddb.cardnum = "";
 	rfiddb.hashval = 0;
+	rfiddb.next = NULL;
   for(i=0; i<TABLESIZE; i++) {
    db[i] = rfiddb;
   }
@@ -125,7 +145,14 @@ load(int argc, char **argv) {
 		if(*buf == '\n') continue;
 		strncpy(str, buf, DBLINESIZE);
 		h=hash(str);
+		// printf("$$$$$$$$$$$$$$$$$$$$\n");
+		// printf("%s", str);
+		// printf("\n**************\n");
 		if(strcmp(db[h].cardnum, buf) == 0) {
+			// printf("$$$$$$$$$$$$$$$$$$$$\n");
+			// printf("%s", db[h].cardnum);
+			// printf("**************\n");
+			
 			printf("\n\n\nhash collision! creating linked list member.\n\n\n");
 		  struct simple_rfid_access rfiddb;
 			rfiddb.cardnum = str;
