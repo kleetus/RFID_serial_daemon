@@ -16,7 +16,7 @@
 
 
 #define TABLESIZE 5000
-#define DBLINESIZE 10
+#define DBLINESIZE 9 //this should be the real size of the db string without a newline or null termination character
 #define BAUDRATE B9600
 
 char db[TABLESIZE][DBLINESIZE];
@@ -31,7 +31,7 @@ int initdb() {
 
 int readindb() {
 	FILE *fp;
-	char b[DBLINESIZE];
+	char b[DBLINESIZE+1];
 	int i = 0;
 	fp = fopen("/var/db/db.txt", "r");	
   if(fp == NULL) {
@@ -40,9 +40,9 @@ int readindb() {
   }  
 	while(fgets(b, sizeof(b), fp)) {
 		if(*b == '\n') continue;
-		strncpy(db[i], b, DBLINESIZE);
-		answers[i] = db[i][strlen(db[i])-1];
-		db[i][strlen(db[i])-1] = '\0';
+		strncpy(db[i], b, DBLINESIZE-1);
+		answers[i] = b[strlen(b)-1];
+		b[strlen(b)-1] = '\0';
 		i++;
 	}
 	fclose(fp);
@@ -75,9 +75,9 @@ main() {
   const struct termios t;
 	const struct winsize w;
 	pid_t pid;
-	char received[2];
+	char received[1];
 	char ans;
-	char cmp[2];
+	char cmp;
 	
 	(void) signal(SIGINT, cleanup);
 	
@@ -106,15 +106,16 @@ main() {
 			for(i=0; i<TABLESIZE; i++){
 				if(db[i][0] != '\0'){
 					printf("sending:	%s\n", db[i]);
+					printf("should be receiving back: \t%c\n", answers[i]);
 					write(am, db[i], strlen(db[i]));
 					write(am, "\n", 1); //this means "do it"
 					read(am, received, 1);
-					printf("receiving:	%s\n", received);
-					sprintf(cmp, "%c", ans);
-					if(strcmp(received, cmp) != 0) {
-						printf("should of received:	%s\n", cmp);
-					}
-					usleep(100000);
+					printf("receiving:	\t\t%s\n", received);
+					//sprintf(cmp, "%c", ans);
+					// if(strcmp(received, cmp) != 0) {
+					// 	printf("should of received:	%s\n", cmp);
+					// }
+					usleep(500000);
 				}
 			}
 		}

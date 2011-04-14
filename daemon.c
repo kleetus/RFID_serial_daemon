@@ -15,7 +15,7 @@
 #include <time.h>
 
 #define TABLESIZE 5000
-#define DBLINESIZE 9
+#define DBLINESIZE 9 //this should be the real size of the db string without a newline or null termination character
 #define BAUDRATE B9600
 #define _POSIX_SOURCE 1
 #define FALSE 0
@@ -31,7 +31,6 @@ struct simple_rfid_access {
 
 void signal_handler_IO(int status);
 struct simple_rfid_access db[TABLESIZE];
-char buf[DBLINESIZE];
 char *ans;
 char *device;
 int fd, logp;
@@ -68,9 +67,15 @@ signal_handler_IO(int status) {
   }
 	//actually look up the answer now
 	struct simple_rfid_access rf = db[h];
-	// char t[10];
-	// sprintf(t, "%i", h);
-	//logdaemonevent(db[h].cardnum);
+
+	char t[256];
+	sprintf(t, "I got sent this: %s", buf);
+	logdaemonevent(t);
+
+	char s[256];
+	sprintf(s, "this is the rf cardnum: %i", h);
+	logdaemonevent(s);
+	
 	while(1) {
 		if(strcmp(rf.cardnum,buf) == 0) { ans = db[h].hashval; break; }
 		else if(rf.next != NULL) {
@@ -127,8 +132,10 @@ load(int argc, char **argv) {
   #else
   FILE *fp;
 	char str[DBLINESIZE];
-  char buf[DBLINESIZE];
+  char buf[DBLINESIZE+1];
 	int h;
+	char ans;
+	char logentry[256];
   if(argc>2) {
 		fp = fopen(argv[2], "r");
 		device = argv[1];
@@ -141,27 +148,27 @@ load(int argc, char **argv) {
     printf("failed to open database.\n");
 		exit(EXIT_FAILURE);
   }
+
   while(fgets(buf, sizeof(buf), fp)) {
 		if(*buf == '\n') continue;
-		strncpy(str, buf, DBLINESIZE);
+		memset(str, '\0', DBLINESIZE);
+		strncpy(str, buf, DBLINESIZE-1);
+		ans = buf[strlen(buf)-1];
 		h=hash(str);
-		// printf("$$$$$$$$$$$$$$$$$$$$\n");
-		// printf("%s", str);
-		// printf("\n**************\n");
-		if(strcmp(db[h].cardnum, buf) == 0) {
-			// printf("$$$$$$$$$$$$$$$$$$$$\n");
-			// printf("%s", db[h].cardnum);
-			// printf("**************\n");
-			
-			printf("\n\n\nhash collision! creating linked list member.\n\n\n");
+		if(strcmp(db[h].cardnum, str) == 0) {
 		  struct simple_rfid_access rfiddb;
+			sprintf(logentry, "\nhash collision for hash: %i from card number: %s creating linked list member.\n", h, str);
+			logdaemonevent(logentry);
 			rfiddb.cardnum = str;
-			rfiddb.hashval = 1; //TODO replace this with the actual
+			rfiddb.hashval = ans;
 			db[h].next = &rfiddb;
 		}
 		else {
 			db[h].cardnum = str;
-			db[h].hashval = 1; //TODO replace this with the actual
+			db[h].hashval = ans;
+			char s[256];
+			sprintf(s, "this is the rf cardnum: %s", db[h].cardnum);
+			logdaemonevent(s);
 		}
   }
   return fclose(fp);
@@ -217,19 +224,18 @@ main(int argc, char **argv) {
    
   pid = fork();
    
-	if(pid < 0) {	logdaemonevent("failed to fork process."); exit(EXIT_FAILURE); }
-  if(pid > 0) {	logdaemonevent("forked process."); exit(EXIT_SUCCESS); }
+	if(pid < 0) {	logdaemonevent("failed to fork daemon event handler process."); exit(EXIT_FAILURE); }
+  if(pid > 0) {	logdaemonevent("forked daemon event handler process."); exit(EXIT_SUCCESS); }
   
   umask(0);
    
   sid = setsid();
-  if (sid < 0) { logdaemonevent("sid less than 0."); exit(EXIT_FAILURE);}
-  if((chdir("/")) < 0) { logdaemonevent("could not chdir to /."); exit(EXIT_FAILURE);}
+  if (sid < 0) { logdaemonevent("sid of daemon event handler less than 0."); exit(EXIT_FAILURE);}
+  if((chdir("/")) < 0) { logdaemonevent("daemon event handler: could not chdir to /."); exit(EXIT_FAILURE);}
    
   close(STDIN_FILENO); close(STDOUT_FILENO); close(STDERR_FILENO);
    
   /* open the device to be non-blocking (read will return immediately) */
-	logdaemonevent(device);
   fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
   if(fd<0) { logdaemonevent("failed to open serial device."); perror(device); exit(EXIT_FAILURE); }
   
