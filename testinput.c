@@ -102,6 +102,8 @@ main() {
 		execv("./daemon", args); //this replaces the child process' pid, so the child process of this app/script is the daemon
 	}
 	else {
+		printf("sleeping for 1 second to ensure daemon is ready to start taking requests...\n\n");
+		sleep(1);
 		while(1){
 			for(i=0; i<TABLESIZE; i++){
 				if(db[i][0] != '\0'){

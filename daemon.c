@@ -26,15 +26,15 @@
 struct simple_rfid_access {
   char *cardnum;
   char hashval;
+	char collisioncnt;
   struct simple_rfid_access *next;
-};
+} db[TABLESIZE];
 
-void signal_handler_IO(int status);
-struct simple_rfid_access db[TABLESIZE];
 char *ans;
 char *device;
 int fd, logp;
 char *version = VERSION;
+void signal_handler_IO(int status);
 
 unsigned int
 hash(char *ch) {
@@ -110,20 +110,26 @@ load(int argc, char **argv) {
   
   #ifdef TESTING
   /* for testing only */
-  int i,h;
-  for(i=1; i<5000; i++) {
-    struct simple_rfid_access rfiddb;
-		h = 0;
-		char n[5];
+  int i,h, collisioncnt;
+  for(i=1; i<5000; i++) {	
+		char *n = calloc(5, sizeof(char));
+
 		sprintf(n, "%i", i);
-		rfiddb.cardnum = n;
-		h = hash(rfiddb.cardnum);
-    rfiddb.hashval = '1'; //just hardcoded to 'yes'
-    if(db[h].cardnum != "") {
-      db[h].next = &rfiddb;
+		
+		h = hash(n);
+		
+		if(strcmp(n, db[h].cardnum) == 0) {
+			//collision!
+			struct simple_rfid_access *rfiddb = calloc(1, sizeof(struct simple_rfid_access));			
+      db[h].next = rfiddb;
+			rfiddb->cardnum = n;
+			rfiddb->collisioncnt++;
+			rfiddb->hashval = '1'; //just hardcoded to 'yes'
     }
     else {
-      db[h] = rfiddb;
+      db[h].cardnum = n;
+			db[h].hashval = '1';
+			db[h].collisioncnt = 0;
     }
 	}
   /* end test */
@@ -131,11 +137,12 @@ load(int argc, char **argv) {
   
   #else
   FILE *fp;
-	char str[DBLINESIZE];
+	char *str;
   char buf[DBLINESIZE+1];
-	int h;
+	int h, collisioncnt;
 	char ans;
 	char logentry[256];
+	
   if(argc>2) {
 		fp = fopen(argv[2], "r");
 		device = argv[1];
@@ -151,24 +158,29 @@ load(int argc, char **argv) {
 
   while(fgets(buf, sizeof(buf), fp)) {
 		if(*buf == '\n') continue;
-		memset(str, '\0', DBLINESIZE);
+		
+		//this memory never gets freed and shouldn't
+		str = calloc(DBLINESIZE, sizeof(char));
+		
 		strncpy(str, buf, DBLINESIZE-1);
 		ans = buf[strlen(buf)-1];
 		h=hash(str);
 		if(strcmp(db[h].cardnum, str) == 0) {
-		  struct simple_rfid_access rfiddb;
 			sprintf(logentry, "\nhash collision for hash: %i from card number: %s creating linked list member.\n", h, str);
 			logdaemonevent(logentry);
-			rfiddb.cardnum = str;
-			rfiddb.hashval = ans;
-			db[h].next = &rfiddb;
+			
+			//this memory never gets freed and shouldn't
+			struct simple_rfid_access *rfiddb = calloc(1, sizeof(struct simple_rfid_access));
+			
+			rfiddb->cardnum = str;
+			rfiddb->hashval = ans;
+			rfiddb->collisioncnt++;
+			db[h].next = rfiddb;
 		}
 		else {
-			db[h].cardnum = str;
+			db[h].cardnum = str; //need to allocate memory here!
 			db[h].hashval = ans;
-			char s[256];
-			sprintf(s, "this is the rf cardnum: %s", db[h].cardnum);
-			logdaemonevent(s);
+			db[h].collisioncnt = 0;
 		}
   }
   return fclose(fp);
@@ -206,6 +218,21 @@ logdaemonevent(char *event) {
 }
 
 int
+dumpdatabase() {
+	logdaemonevent("starting dump of db\n");
+	int i;
+	for(i=0; i<TABLESIZE; i++) {
+		if(strcmp(db[i].cardnum,"") != 0) {
+			char s[100];
+			sprintf(s, "key: %i --- value: ( cardnum - %s, answer - %c, number of collisions - %i", i, db[i].cardnum, db[i].hashval, db[i].collisioncnt);
+			logdaemonevent(s);
+		}
+	}
+	logdaemonevent("ending dump of db\n\n");
+	return 1;
+}
+
+int
 main(int argc, char **argv) {
   struct termios newtio;
   struct sigaction saio;
@@ -221,7 +248,9 @@ main(int argc, char **argv) {
 
 	sprintf(logentry, "Starting rfid serial daemon, version %s", version);
 	logdaemonevent(logentry);
-   
+  
+	dumpdatabase();
+	
   pid = fork();
    
 	if(pid < 0) {	logdaemonevent("failed to fork daemon event handler process."); exit(EXIT_FAILURE); }
