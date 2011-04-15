@@ -132,7 +132,7 @@ main() {
 					if(!passed) {
 						printf("\n\n\t\tReceived: %c -- Expected: %c\n\n", received[0], answers[i]);
 					}
-					usleep(120000);
+					sleep(1);
 				}
 			}
 		}
