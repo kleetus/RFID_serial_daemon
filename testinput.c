@@ -14,10 +14,19 @@
 #include <pty.h>
 #include <time.h>  
 
-
 #define TABLESIZE 5000
 #define DBLINESIZE 9 //this should be the real size of the db string without a newline or null termination character
 #define BAUDRATE B9600
+
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+
 
 char db[TABLESIZE][DBLINESIZE];
 char answers[TABLESIZE];
@@ -76,8 +85,9 @@ main() {
 	const struct winsize w;
 	pid_t pid;
 	char received[1];
-	char ans;
 	char cmp;
+	char ans[40];
+	int passed;
 	
 	(void) signal(SIGINT, cleanup);
 	
@@ -102,22 +112,25 @@ main() {
 		execv("./daemon", args); //this replaces the child process' pid, so the child process of this app/script is the daemon
 	}
 	else {
-		printf("sleeping for 1 second to ensure daemon is ready to start taking requests...\n\n");
-		sleep(1);
+		printf("sleeping for a bit to ensure daemon is ready to start taking requests...\n\n");
+		usleep(500000);    
 		while(1){
 			for(i=0; i<TABLESIZE; i++){
 				if(db[i][0] != '\0'){
-					printf("sending:	%s\n", db[i]);
-					printf("should be receiving back: \t%c\n", answers[i]);
 					write(am, db[i], strlen(db[i]));
-					write(am, "\n", 1); //this means "do it"
+					write(am, "\n", 1); 
 					read(am, received, 1);
-					printf("receiving:	\t\t%s\n", received);
-					//sprintf(cmp, "%c", ans);
-					// if(strcmp(received, cmp) != 0) {
-					// 	printf("should of received:	%s\n", cmp);
-					// }
-					usleep(500000);
+					sprintf(ans, "%sFAIL", KRED);
+					passed = 0;
+					if(received[0] == answers[i]) {
+						sprintf(ans, "%sOK", KGRN);
+						passed = 1;
+					}					
+					printf("%ssending:%s	%s...%s%s\n", KCYN, KMAG, db[i], ans, KNRM);
+					if(!passed) {
+						printf("\n\n\t\tReceived: %c -- Expected: %c\n\n", received[0], answers[i]);
+					}
+					usleep(120000);
 				}
 			}
 		}
