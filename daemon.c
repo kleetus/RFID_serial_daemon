@@ -34,6 +34,7 @@ char *ans;
 char *device;
 int fd, logp;
 char *version = VERSION;
+
 void signal_handler_IO(int status);
 
 unsigned int
@@ -49,6 +50,13 @@ hash(char *ch) {
 
 void
 signal_handler_IO(int status) {
+	//might need to disable signal handling or global interrupts here
+	//this routine is not reentrant
+	
+	char r[5];
+	sprintf(r, "%i", status);
+	logdaemonevent(r);
+	
 	char buf[256];
 	char logbuf[256];
 	int h;

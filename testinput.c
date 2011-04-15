@@ -88,6 +88,7 @@ main() {
 	char cmp;
 	char ans[40];
 	int passed;
+	char retbuf[30];
 	
 	(void) signal(SIGINT, cleanup);
 	
@@ -117,8 +118,9 @@ main() {
 		while(1){
 			for(i=0; i<TABLESIZE; i++){
 				if(db[i][0] != '\0'){
-					write(am, db[i], strlen(db[i]));
-					write(am, "\n", 1); 
+					sprintf(retbuf, "%s\n", db[i]);
+					write(am, retbuf, strlen(db[i])+1);
+					usleep(1000);
 					read(am, received, 1);
 					sprintf(ans, "%sFAIL", KRED);
 					passed = 0;
