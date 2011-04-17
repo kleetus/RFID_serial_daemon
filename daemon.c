@@ -15,7 +15,7 @@
 #include <time.h>
 
 #define TABLESIZE 5000
-#define DBLINESIZE 9 //this should be the real size of the db string without a newline or null termination character
+#define DBLINESIZE 13 //this should be the real size of the db string without a newline or null termination character
 #define BAUDRATE B9600
 #define _POSIX_SOURCE 1
 #define FALSE 0
@@ -45,28 +45,23 @@ hash(char *ch) {
      hashvalue += *ch++;
      hashvalue *= 13;
   } while (*ch);
- return(hashvalue % TABLESIZE);
+  return(hashvalue % TABLESIZE);
 }
 
 void
 signal_handler_IO(int status) {
-	//might need to disable signal handling or global interrupts here
-	//this routine is not reentrant
-	
-	char r[5];
-	sprintf(r, "%i", status);
-	logdaemonevent(r);
-	
-	char buf[256];
-	char logbuf[256];
-	int h;
-	char ans = '0';
-	memset(logbuf, '\0', sizeof(logbuf));
-	memset(buf, '\0', sizeof(buf));
+  char buf[256];
+  char logbuf[256];
+  int h;
+  char ans = '0';
+ 
+  memset(logbuf, '\0', sizeof(logbuf));
+  memset(buf, '\0', sizeof(buf));
+  
   if(read(fd, buf, DBLINESIZE) < DBLINESIZE) {
-		ans = '3';
-		goto error_condition;
-	}
+    ans = '3';
+    goto error_condition;
+  }
 	buf[strlen(buf)-1] = '\0';
 	h=hash(buf);
   if(h > TABLESIZE) {
@@ -79,10 +74,6 @@ signal_handler_IO(int status) {
 	char t[256];
 	sprintf(t, "I got sent this: %s", buf);
 	logdaemonevent(t);
-
-	char s[256];
-	sprintf(s, "this is the rf cardnum: %i", h);
-	logdaemonevent(s);
 	
 	while(1) {
 		if(strcmp(rf.cardnum,buf) == 0) { ans = db[h].hashval; break; }
@@ -158,7 +149,8 @@ load(int argc, char **argv) {
   else {
 		fp = fopen("/var/db/db.txt", "r");
 		device = "/dev/ttyS0";
-	} 
+	}
+  
   if(fp == NULL) {
     printf("failed to open database.\n");
 		exit(EXIT_FAILURE);
@@ -173,6 +165,7 @@ load(int argc, char **argv) {
 		strncpy(str, buf, DBLINESIZE-1);
 		ans = buf[strlen(buf)-1];
 		h=hash(str);
+    
 		if(strcmp(db[h].cardnum, str) == 0) {
 			sprintf(logentry, "\nhash collision for hash: %i from card number: %s creating linked list member.\n", h, str);
 			logdaemonevent(logentry);
@@ -232,7 +225,7 @@ dumpdatabase() {
 	for(i=0; i<TABLESIZE; i++) {
 		if(strcmp(db[i].cardnum,"") != 0) {
 			char s[100];
-			sprintf(s, "key: %i --- value: ( cardnum - %s, answer - %c, number of collisions - %i", i, db[i].cardnum, db[i].hashval, db[i].collisioncnt);
+			sprintf(s, "key: %i --- value: ( cardnum - %s, answer - %c, number of collisions - %i )", i, db[i].cardnum, db[i].hashval, db[i].collisioncnt);
 			logdaemonevent(s);
 		}
 	}
@@ -242,14 +235,14 @@ dumpdatabase() {
 
 int
 main(int argc, char **argv) {
-  struct termios newtio;
-  struct sigaction saio;
-  pid_t pid, sid;
-  sigset_t st;
+ struct termios newtio;
+ struct sigaction saio;
+ pid_t pid, sid;
+ sigset_t st;
 
-	char logentry[256];
+ char logentry[256];
 	
-	opendaemonlog(); //this could make the app fail if there is no log file, watch stdout
+ opendaemonlog(); //this could make the app fail if there is no log file, watch stdout
 	
   clear();
   load(argc, argv);
