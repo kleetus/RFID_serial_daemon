@@ -14,7 +14,7 @@
 #include <pty.h>
 #include <time.h>
 
-#define TABLESIZE 5000
+#define TABLESIZE 1000000
 #define DBLINESIZE 13 //this should be the real size of the db string without a newline or null termination character
 #define BAUDRATE B9600
 #define _POSIX_SOURCE 1
@@ -51,6 +51,8 @@ hash(char *ch) {
 void
 signal_handler_IO(int status) {
   char buf[256];
+  char buf2[256];
+  char buf3[256];
   char logbuf[256];
   int h;
   char ans = '0';
@@ -58,12 +60,33 @@ signal_handler_IO(int status) {
   memset(logbuf, '\0', sizeof(logbuf));
   memset(buf, '\0', sizeof(buf));
   
-  if(read(fd, buf, DBLINESIZE) < DBLINESIZE) {
-    ans = '3';
-    goto error_condition;
+  int r = read(fd, buf, 50);
+  char l[10];
+  sprintf(l, "%d", r);
+  logdaemonevent(l);
+
+  int s = read(fd, buf2, 50);
+  char m[10];
+  sprintf(m, "%d", s);
+  logdaemonevent(m);
+  
+  char n[10];
+  sprintf(n, "%c", buf[0]);
+  logdaemonevent(n);
+  
+  int p;
+  for(p=1; p<DBLINESIZE; p++) {
+    buf3[p-1] = buf[p];
   }
-	buf[strlen(buf)-1] = '\0';
-	h=hash(buf);
+  
+  //if(r < DBLINESIZE) {
+  //  ans = '3';
+  //  goto error_condition;
+  //}
+  
+	//buf[strlen(buf)-1] = '\0';
+	h=hash(buf3);
+    
   if(h > TABLESIZE) {
 		ans = '4';
 		goto error_condition;
@@ -71,10 +94,6 @@ signal_handler_IO(int status) {
 	//actually look up the answer now
 	struct simple_rfid_access rf = db[h];
 
-	char t[256];
-	sprintf(t, "I got sent this: %s", buf);
-	logdaemonevent(t);
-	
 	while(1) {
 		if(strcmp(rf.cardnum,buf) == 0) { ans = db[h].hashval; break; }
 		else if(rf.next != NULL) {
@@ -86,7 +105,7 @@ signal_handler_IO(int status) {
 		}
 	}
 error_condition:
-	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", buf, ans);
+	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", buf3, ans);
 	logdaemonevent(logbuf);
 	write(fd, &ans, 1);
 }
@@ -162,9 +181,13 @@ load(int argc, char **argv) {
 		//this memory never gets freed and shouldn't
 		str = calloc(DBLINESIZE, sizeof(char));
 		
-		strncpy(str, buf, DBLINESIZE-1);
+		strncpy(str, buf, strlen(buf)-1);
 		ans = buf[strlen(buf)-1];
 		h=hash(str);
+    
+    char l[10];
+    sprintf(l, "%d", strlen(str));
+    logdaemonevent(l);
     
 		if(strcmp(db[h].cardnum, str) == 0) {
 			sprintf(logentry, "\nhash collision for hash: %i from card number: %s creating linked list member.\n", h, str);
