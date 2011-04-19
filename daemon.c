@@ -50,52 +50,45 @@ hash(char *ch) {
 
 void
 signal_handler_IO(int status) {
-  char buf[256];
-  char buf2[256];
-  char buf3[256];
+  char buf[50];
+  char buf2[50];
+  char str[DBLINESIZE];
   char logbuf[256];
-  int h;
+  int h,i,j;
   char ans = '0';
  
   memset(logbuf, '\0', sizeof(logbuf));
   memset(buf, '\0', sizeof(buf));
+  memset(str, '\0', sizeof(str));
   
   int r = read(fd, buf, 50);
-  char l[10];
-  sprintf(l, "%d", r);
-  logdaemonevent(l);
-
-  int s = read(fd, buf2, 50);
-  char m[10];
-  sprintf(m, "%d", s);
-  logdaemonevent(m);
+  read(fd, buf2, 50);
   
-  char n[10];
-  sprintf(n, "%c", buf[0]);
-  logdaemonevent(n);
-  
-  int p;
-  for(p=1; p<DBLINESIZE; p++) {
-    buf3[p-1] = buf[p];
+  j=0;
+  for(i=0; j<DBLINESIZE; i++) {
+    if(buf[i]==3 || buf[i]==2 || buf[i]==10) { continue; }
+    str[j++] = buf[i];
   }
   
-  //if(r < DBLINESIZE) {
-  //  ans = '3';
-  //  goto error_condition;
-  //}
+  str[DBLINESIZE-1] = '\0';
   
-	//buf[strlen(buf)-1] = '\0';
-	h=hash(buf3);
-    
-  if(h > TABLESIZE) {
+  if(strlen(str) < DBLINESIZE-1) {
+    ans = '3';
+    goto error_condition;
+  }
+ 
+	h=hash(str);
+  
+  if(h >= TABLESIZE) {
 		ans = '4';
 		goto error_condition;
   }
+  
 	//actually look up the answer now
 	struct simple_rfid_access rf = db[h];
 
 	while(1) {
-		if(strcmp(rf.cardnum,buf) == 0) { ans = db[h].hashval; break; }
+		if(strcmp(rf.cardnum,str) == 0) { ans = db[h].hashval; break; }
 		else if(rf.next != NULL) {
 			rf = *(rf.next);
 		}
@@ -105,7 +98,7 @@ signal_handler_IO(int status) {
 		}
 	}
 error_condition:
-	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", buf3, ans);
+	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", str, ans);
 	logdaemonevent(logbuf);
 	write(fd, &ans, 1);
 }
