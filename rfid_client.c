@@ -18,7 +18,7 @@ void main() {
 	UART1_Init(9600);
 	Software_UART_Init(PORTB, 0, 1, 9600, 0);
 	
-	char count, error, i;
+	char count, error, i, ans;
 	char cardnum[16];
 	
 	while(1) {
@@ -29,8 +29,22 @@ void main() {
 		if(count>15) {
 			LATA.F1 = 0;
 			//disable uart interrupt
+			//enable timer0 interrupt
+			//init timer0
 			for(i=0; i<count; i++) {
-				Soft_UART_Write(cardnum[i]);
+				error = Soft_UART1_Write(cardnum[i]); //or call a custom function that handles collision avoidance
+			}
+			while(1) {
+				ans = Soft_UART1_Read(&error);
+				if(ans=='1') {
+					
+				}
+				else if(ans=='0') {
+					
+				}
+				else {
+					
+				}
 			}
 			
 		}
@@ -38,6 +52,7 @@ void main() {
 		
 		
 	}
+	
 	/*code
 	
 	pins: 
@@ -47,15 +62,15 @@ void main() {
 		A1 is the reset pin for the rfid 
 		
 	1. init hardware
-	2. setup interrupts
-	3. init both serial ports
+	2. set the counter to 0
+	3. setup interrupts
 	
-	4. enter main loop
-	5. cycle until data ready on UART1, populate data structure (cardnum) one at a time
-	6. when cardnum is has a strlen of greater than 15, 
-	7.	send the reset pin on the rfid chip to 0 
-	8.	disable the interrtupt for UART1
-	9.	set the counter to 0
+	4. init both serial ports
+	5. enter main loop
+	6. cycle until data ready on UART1, populate data structure (cardnum) one at a time
+	7.	when cardnum is has a strlen of greater than 15, 
+	8.	send the reset pin on the rfid chip to 0 
+	9.	disable the interrtupt for UART1
 	10.	enable the interrupt for TIMER0
 	11.	initialize timer0
 	12.	then send data to other serial port TODO: might need some collision detection here such as:
