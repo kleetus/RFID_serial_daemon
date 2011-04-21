@@ -12,43 +12,60 @@ void main() {
      OSCCON = 0b11111111; //8Mhz
      ADCON1 |= 0x0F;
      T0CON = 0xC4;
-     TMR0L = 96;
-     INTCON.TMR0IE = 1;
-     TRISB = 0;
+     TMR0L = 96; //preload for about 1 second every 400 interrupts (roughly)
+     INTCON.TMR0IE = 1; //enable timer0 interrupt
+     TRISB = 0; 
      TRISA = 0;
-     PORTB = 0xFF;
-     cnt = 0;
      LATA=0x00;
      LATA.F0 = 1;
      LATA.F1 = 1;
      LATB.F7 = 0;
      LATB.F6 = 0;
+     cnt = 0; //global interrupts are still off
+
      UART1_Init(9600);
-     Soft_UART_Init(&PORTB, 1, 0, 9600, 0);
+
+     Soft_UART_Init(&PORTB, 1, 0, 9600, 0); //B1 = receive, B0 = transmit, 9600, do not invert
      Delay_ms(100);
+
      while(1) {
-         if(cnt==600) { memset(cardnum, '\0', 16); }
+				 /*
+				   if we cycled around for about 1.5 seconds with stuff in the 
+					 send buffer (cardnum) and there is not enough to send to the server, 
+					 then clear it out and start over
+				 */
+			   if(cnt>600) { cnt=0; memset(cardnum, '\0', 16); } 
+			
          count=0;
+
          if(UART1_Data_Ready()) {
-             INTCON.GIE = 0;
-             cnt = 0;
-             cardnum[count++] = UART1_read(); //what if I never get enough chars? should I clear the queue array?
+             INTCON.GIE = 0; //we don't want interrupts preempting the reading of card data
+             cnt = 0; //we've taken in chars, reset the counter
+             cardnum[count++] = UART1_read();
              INTCON.GIE = 1;
          }
+
          if(count>15) {
-             LATA.F1 = 0;
-             INTCON.GIE = 0;
+             LATA.F1 = 0; //turn off the rfid card reader, we are sending the last scanned card, don't want people scanning during this time
+
+             INTCON.GIE = 0; //we don't want interrupts preempting our sending of data
+
              for(i=0; i<count; i++) {
-                 Soft_UART_Write(cardnum[i]); //or call a custom function that handles collision avoidance
+                 Soft_UART_Write(cardnum[i]); //TODO: or call a custom function that handles collision avoidance
              }
-             INTCON.GIE = 1;
+
              cnt = 0;
-             ans = Soft_UART_Read(&error);
+
+             INTCON.GIE = 1;
+
+             ans = Soft_UART_Read(&error); //try to read once, we will most likely fail the first time (not enough time for the data to process)
              while(error) {
-               if(cnt==600) { INTCON.GIE = 0; goto coms_error; }
+               if(cnt>600) { INTCON.GIE = 0; goto coms_error; } //we've spent too long waiting for a reply, give up
                ans = Soft_UART_Read(&error);
              }
-             INTCON.GIE = 0;
+
+             INTCON.GIE = 0; //we shouldn't need interrupts until we are out of the cardnum sending handler
+
              if(ans == '1') {
                  LATA.F0 = 0;
                  LATB.F7 = 1;
@@ -56,24 +73,25 @@ void main() {
                  LATA.F0 = 1;
                  LATB.F7 = 0;
              }
-             else if(ans == '0'){
+             else if(ans == '0') {
                  LATB.F6 = 1;
                  Delay_ms(2500);
                  LATB.F6 = 0;
              }
              else {
 coms_error:
-                 for(i=0; i<10; i++) {
-                     LATB.F6 = 1;
-                     LATB.F7 = 1;
-                     Delay_ms(250);
-                     LATB.F6 = 0;
-                     LATB.F7 = 0;
+								LATB.F6=1;
+								LATB.F7=0;
+								for(i=0; i<10; i++) {
+                     LATB.F6 = ~LATB.F6;
+                     LATB.F7 = ~LATB.F7;
+                     Delay_ms(200);
                  }
              }
          }
          INTCON.GIE = 1; //turn on the global interrupt
          LATA.F1 = 1; //turn the rfid reader back on
+			 	 LATA.F0 = 1; //ensure the door is locked again 
      }
 }
 
