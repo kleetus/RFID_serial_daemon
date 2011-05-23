@@ -15,7 +15,7 @@
 #include <time.h>
 
 #define TABLESIZE 1000000
-#define DBLINESIZE 13 //this should be the real size of the db string without a newline or null termination character
+#define DBLINESIZE 14 //this should be the real size of the db string without a newline or null termination character
 #define BAUDRATE B9600
 #define _POSIX_SOURCE 1
 #define FALSE 0
@@ -52,7 +52,6 @@ hash(char *ch) {
 void
 signal_handler_IO(int status) {
   char buf[50];
-  char buf2[50];
   char str[DBLINESIZE];
   char logbuf[256];
   int h,i,j;
