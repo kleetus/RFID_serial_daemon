@@ -56,7 +56,9 @@ signal_handler_IO(int status) {
   char logbuf[256];
   int h,i,j;
   char ans = '0';
- 
+  char station_id = '0';
+  char ansstr[4];
+  
   memset(logbuf, '\0', sizeof(logbuf));
   memset(buf, '\0', sizeof(buf));
   memset(str, '\0', sizeof(str));
@@ -68,6 +70,7 @@ signal_handler_IO(int status) {
   j=0;
   for(i=0; j<DBLINESIZE; i++) {
     if(buf[i]==3 || buf[i]==2 || buf[i]==10) { continue; }
+    if(i==2) { station_id = buf[i]; continue; }
     str[j++] = buf[i];
   }
   
@@ -101,7 +104,8 @@ error_condition:
   if(strcmp(str, "3400C2DF0B22") == 0){ans='1';}//this is the admin key in case the database is destroyed or unavailable
 	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", str, ans);
 	logdaemonevent(logbuf);
-	int p = write(fd, &ans, 1);
+	sprintf(ansstr, "%c@%c", ans, station_id);
+	write(fd, ansstr, 3);
 }
 
 void
