@@ -34,6 +34,7 @@ char *ans;
 char *device;
 int fd, logp;
 char *version = VERSION;
+struct termios oldtio;
 
 void signal_handler_IO(int status);
 
@@ -61,8 +62,9 @@ signal_handler_IO(int status) {
   memset(buf, '\0', sizeof(buf));
   memset(str, '\0', sizeof(str));
   
-  int r = read(fd, buf, 50);
-  read(fd, buf2, 50);
+  read(fd, buf, 50);
+  
+  tcflush(fd, TCIFLUSH);
   
   j=0;
   for(i=0; j<DBLINESIZE; i++) {
@@ -73,7 +75,7 @@ signal_handler_IO(int status) {
   str[DBLINESIZE-1] = '\0';
   
   if(strlen(str) < DBLINESIZE-1) {
-    ans = '3';
+    ans = '3'; 
     goto error_condition;
   }
  
@@ -83,8 +85,7 @@ signal_handler_IO(int status) {
 		ans = '4';
 		goto error_condition;
   }
-  
-	//actually look up the answer now
+    
 	struct simple_rfid_access rf = db[h];
 
 	while(1) {
@@ -98,9 +99,10 @@ signal_handler_IO(int status) {
 		}
 	}
 error_condition:
+  if(strcmp(str, "3400C2DF0B22") == 0){ans='1';}//this is the admin key in case the database is destroyed or unavailable
 	sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", str, ans);
 	logdaemonevent(logbuf);
-	write(fd, &ans, 1);
+	int p = write(fd, &ans, 1);
 }
 
 void
@@ -159,7 +161,7 @@ load(int argc, char **argv) {
 		device = argv[1];
 	}
   else {
-		fp = fopen("/var/db/db.txt", "r");
+		fp = fopen("/root/RFID_serial_daemon/db_real.txt", "r");
 		device = "/dev/ttyS0";
 	}
   
@@ -249,12 +251,23 @@ dumpdatabase() {
 	return 1;
 }
 
+void
+cleanup(int sig) {
+   tcsetattr(fd,TCSANOW,&oldtio);
+   close(fd);
+   closedaemonlog();
+	 system("killall daemon");
+	(void) signal(SIGINT, SIG_DFL);
+}
+
 int
 main(int argc, char **argv) {
  struct termios newtio;
  struct sigaction saio;
  pid_t pid, sid;
  sigset_t st;
+
+ (void) signal(SIGINT, cleanup);
 
  char logentry[256];
 	
@@ -300,8 +313,9 @@ main(int argc, char **argv) {
   fcntl(fd, F_SETOWN, getpid());
   fcntl(fd, F_SETFL, FASYNC);
   
+  tcgetattr(fd,&oldtio); /* save current port settings */
   /* set new port settings for canonical input processing */
-  newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;
+  newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
   newtio.c_iflag = IGNPAR | ICRNL;
   newtio.c_oflag = 0;
   newtio.c_lflag = ICANON;
@@ -313,8 +327,6 @@ main(int argc, char **argv) {
   while (1) {
     usleep(100000);
   }   
-
-	closedaemonlog();
 	
   exit(EXIT_SUCCESS);
 }
