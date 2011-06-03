@@ -176,9 +176,6 @@ load(int argc, char **argv) {
     strncpy(str, buf, strlen(buf)-1);
     ans = buf[strlen(buf)-1];
     h=hash(str);
-    char l[10];
-    sprintf(l, "%d", strlen(str));
-    logdaemonevent(l);
   
     if(strcmp(db[h].cardnum, str) == 0) {
       sprintf(logentry, "\nhash collision for hash: %i from card number: %s creating linked list member.\n", h, str);
