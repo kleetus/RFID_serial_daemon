@@ -1,5 +1,5 @@
 #include <iostream>
-#include <hash_map>
+#include <unordered_map>
 #include <cstring>
 #include <termios.h>
 #include <sys/signal.h>
@@ -17,12 +17,13 @@ using namespace __gnu_cxx;
 //#define TESTING 1
 
 char *ans;
-char *device;
+std::string device;
 int fd, logp;
-char *version = VERSION;
+string version = VERSION;
 struct termios oldtio;
 
-void signal_handler_IO(int status);
+void signal_handler_IO(int);
+void logdaemonevent(char*); 
 
 void
 signal_handler_IO(int status) {
@@ -61,18 +62,6 @@ signal_handler_IO(int status) {
     goto error_condition;
   }
     
-  struct simple_rfid_access rf = db[h];
-
-  while(1) {
-    if(strcmp(rf.cardnum,str) == 0) { ans = db[h].hashval; break; }
-    else if(rf.next != NULL) {
-      rf = *(rf.next);
-    }
-    else {
-      ans = '5';
-      break;
-    }
-  }
 error_condition:
   if(strcmp(str, "3400C2DF0B22") == 0){ans='1';}//this is the admin key in case the database is destroyed or unavailable
     sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", str, ans);
@@ -83,31 +72,6 @@ error_condition:
 
 int
 load(int argc, char **argv) {
-  
-  #ifdef TESTING
-  /* for testing only */
-  int i,h, collisioncnt;
-  for(i=1; i<5000; i++) {	
-    char *n = calloc(5, sizeof(char));
-    sprintf(n, "%i", i);
-    if(strcmp(n, db[h].cardnum) == 0) {
-      //collision!
-      struct simple_rfid_access *rfiddb = calloc(1, sizeof(struct simple_rfid_access));			
-      db[h].next = rfiddb;
-      rfiddb->cardnum = n;
-      rfiddb->collisioncnt++;
-      rfiddb->hashval = '1'; //just hardcoded to 'yes'
-    }
-    else {
-      db[h].cardnum = n;
-      db[h].hashval = '1';
-      db[h].collisioncnt = 0;
-    }
-  }
-  /* end test */
-  
-  
-  #else
   FILE *fp;
   char *str;
   char buf[DBLINESIZE+1];
@@ -132,12 +96,11 @@ load(int argc, char **argv) {
   while(fgets(buf, sizeof(buf), fp)) {
     if(*buf == '\n') continue;
     //this memory never gets freed and shouldn't
-    str = calloc(DBLINESIZE, sizeof(char));
+    str = (char*)calloc(DBLINESIZE, sizeof(char));
     strncpy(str, buf, strlen(buf)-1);
     ans = buf[strlen(buf)-1];
-  
+  } 
   return fclose(fp);
-  #endif
 }
 
 int
