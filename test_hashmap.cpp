@@ -1,28 +1,53 @@
 #include <iostream>
-#include <hash_map>
+#include <fstream>
+#include <ext/hash_map>
 #include <cstring>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
+#include <syslog.h>
+#include <string.h>
 #include <termios.h>
+#include <unistd.h>
 #include <sys/signal.h>
+#include <sys/types.h>
 #include <pty.h>
+#include <time.h>
+
 using namespace std;
 using namespace __gnu_cxx;
 
-#define TABLESIZE 10000000
-#define DBLINESIZE 13 //this should be the real size of the db string without a newline or null termination character
+namespace __gnu_cxx {
+  template<>
+  struct hash<std::string>
+  {
+    hash<char*> h;
+    size_t operator()(const std::string &s) const
+    {
+      return h(s.c_str());
+    };
+  };
+}
+
 #define BAUDRATE B9600
 #define _POSIX_SOURCE 1
 #define FALSE 0
 #define TRUE 1
-#define VERSION "0.1"
-//#define TESTING 1
+#define VERSION "0.2"
 
-char *ans;
-char *device;
-int fd, logp;
-char *version = VERSION;
+std::string device;
+int fd;
+ofstream logp;
+string version = VERSION;
 struct termios oldtio;
+hash_map<string, string> db;
 
-void signal_handler_IO(int status);
+void signal_handler_IO(int);
+void logdaemonevent(char*);
 
 void
 signal_handler_IO(int status) {
@@ -60,19 +85,6 @@ signal_handler_IO(int status) {
     ans = '4';
     goto error_condition;
   }
-    
-  struct simple_rfid_access rf = db[h];
-
-  while(1) {
-    if(strcmp(rf.cardnum,str) == 0) { ans = db[h].hashval; break; }
-    else if(rf.next != NULL) {
-      rf = *(rf.next);
-    }
-    else {
-      ans = '5';
-      break;
-    }
-  }
 error_condition:
   if(strcmp(str, "3400C2DF0B22") == 0){ans='1';}//this is the admin key in case the database is destroyed or unavailable
     sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", str, ans);
@@ -83,109 +95,57 @@ error_condition:
 
 int
 load(int argc, char **argv) {
-  
-  #ifdef TESTING
-  /* for testing only */
-  int i,h, collisioncnt;
-  for(i=1; i<5000; i++) {	
-    char *n = calloc(5, sizeof(char));
-    sprintf(n, "%i", i);
-    if(strcmp(n, db[h].cardnum) == 0) {
-      //collision!
-      struct simple_rfid_access *rfiddb = calloc(1, sizeof(struct simple_rfid_access));			
-      db[h].next = rfiddb;
-      rfiddb->cardnum = n;
-      rfiddb->collisioncnt++;
-      rfiddb->hashval = '1'; //just hardcoded to 'yes'
-    }
-    else {
-      db[h].cardnum = n;
-      db[h].hashval = '1';
-      db[h].collisioncnt = 0;
-    }
-  }
-  /* end test */
-  
-  
-  #else
-  FILE *fp;
-  char *str;
-  char buf[DBLINESIZE+1];
-  int h, collisioncnt;
-  char ans;
-  char logentry[256];
+  ifstream fp;
+  std::string key;
+  std::string value;
+  std::string line;
 	
-  if(argc>2) {
-    fp = fopen(argv[2], "r");
-    device = argv[1];
-  }
-  else {
-    fp = fopen("./db_real.txt", "r");
-    device = "/dev/ttyS0";
-  }
+  fp.open("./db_real.txt");
+  device = "/dev/ttyS0";
   
-  if(fp == NULL) {
-    printf("failed to open database.\n");
-    exit(EXIT_FAILURE);
+  if (fp.is_open())
+  {
+    while (fp.good())
+    {
+      getline(fp, line);
+      if(line.length()<13) continue;
+      key = line.substr(0,line.length()-2);
+      value = line.substr(line.length()-2, line.length()-1);
+      db[key] = value;
+      logdaemonevent("[cardnum] - " << key << " - [answer] --" answer); 
+    }
+    fp.close();
   }
+  else logdaemonevent("Unable to open database file"); 
 
-  while(fgets(buf, sizeof(buf), fp)) {
-    if(*buf == '\n') continue;
-    //this memory never gets freed and shouldn't
-    str = calloc(DBLINESIZE, sizeof(char));
-    strncpy(str, buf, strlen(buf)-1);
-    ans = buf[strlen(buf)-1];
-  
-  return fclose(fp);
-  #endif
 }
 
 int
 opendaemonlog() {
-  logp = open("/var/log/rfid_daemon.log", O_RDWR | O_APPEND);
-  if(logp < 0) { 
-    printf("failed to open log file: /var/log/rfid_daemon.log");
+  logp.open("/var/log/rfid_daemon.log");
+  if(!logp.is_open()) {
+    cout << "failed to open log file: /var/log/rfid_daemon.log" << endl;
     exit(EXIT_FAILURE);
   }
-  return 1;
+  return 0;
 }
 
-int closedaemonlog() {
-  close(logp);
-  return 1;
+int 
+closedaemonlog() {
+  logp.close();
+  return 0;
 }
 
-int
-logdaemonevent(char *event) {
-  char log[256];
-  log[0] = '\0';
+void
+logdaemonevent(std::string log) {
   time_t t = time(NULL);
-  char *logtime = ctime(&t);
-  logtime[strlen(logtime)-1] = ' ';
-  logtime[strlen(logtime)] = '\0';
-  strcat(log, logtime);
-  strcat(log, event);
-  strcat(log, "\n");
-  write(logp, log, strlen(log));
-  return 1;
+  std::string logtime = (std::string)ctime(&t);
+  logp << logtime << " :::  " <<  log << endl;
 }
 
 int
 dumpdatabase() {
-  logdaemonevent("starting dump of db\n");
-  int i,n;
-  n=0;
-  for(i=0; i<TABLESIZE; i++) {
-    if(strcmp(db[i].cardnum,"") != 0) {
-      char s[100];
-      sprintf(s, "key: %i --- value: ( cardnum - %s, answer - %c, number of collisions - %i )", i, db[i].cardnum, db[i].hashval, db[i].collisioncnt);
-      logdaemonevent(s);
-      n++;
-    }
-  }
-  char f[256];
-  sprintf(f, "ending dump of db\n\nbrought in: %d records.\n\n", n);
-  logdaemonevent(f);
+  logdaemonevent((char *)"starting dump of db\n");
   return 1;
 }
 
@@ -198,42 +158,38 @@ cleanup(int sig) {
   (void) signal(SIGINT, SIG_DFL);
 }
 
-int main(){
- struct termios newtio;
- struct sigaction saio;
- pid_t pid, sid;
- sigset_t st;
+int main(int argc, char **argv){
+  struct termios newtio;
+  struct sigaction saio;
+  pid_t pid, sid;
+  sigset_t st;
+  
+  (void) signal(SIGINT, cleanup);
 
- (void) signal(SIGINT, cleanup);
-
- char logentry[256];
+  char logentry[256];
 	
- opendaemonlog(); //this could make the app fail if there is no log file, watch stdout
+  opendaemonlog(); //this could make the app fail if there is no log file, watch stdout
 	
-  clear();
   load(argc, argv);
-
-  sprintf(logentry, "Starting rfid serial daemon, version %s", version);
-  logdaemonevent(logentry);
   
   dumpdatabase();
 	
   pid = fork();
    
-  if(pid < 0) {	logdaemonevent("failed to fork daemon event handler process."); exit(EXIT_FAILURE); }
-  if(pid > 0) {	logdaemonevent("forked daemon event handler process."); exit(EXIT_SUCCESS); }
+  if(pid < 0) {	logdaemonevent((char *)"failed to fork daemon event handler process."); exit(EXIT_FAILURE); }
+  if(pid > 0) {	logdaemonevent((char *)"forked daemon event handler process."); exit(EXIT_SUCCESS); }
   
   umask(0);
    
   sid = setsid();
-  if (sid < 0) { logdaemonevent("sid of daemon event handler less than 0."); exit(EXIT_FAILURE);}
-  if((chdir("/")) < 0) { logdaemonevent("daemon event handler: could not chdir to /."); exit(EXIT_FAILURE);}
+  if (sid < 0) { logdaemonevent((char *)"sid of daemon event handler less than 0."); exit(EXIT_FAILURE);}
+  if((chdir("/")) < 0) { logdaemonevent((char *)"daemon event handler: could not chdir to /."); exit(EXIT_FAILURE);}
    
   close(STDIN_FILENO); close(STDOUT_FILENO); close(STDERR_FILENO);
    
   /* open the device to be non-blocking (read will return immediately) */
-  fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-  if(fd<0) { logdaemonevent("failed to open serial device."); perror(device); exit(EXIT_FAILURE); }
+  fd = open(device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+  if(fd<0) { logdaemonevent((char *)"failed to open serial device."); perror(device.c_str()); exit(EXIT_FAILURE); }
   
   /* install the signal handler before making the device asynchronous */
   saio.sa_handler = signal_handler_IO;
