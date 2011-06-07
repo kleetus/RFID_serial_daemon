@@ -1,10 +1,7 @@
 #include <iostream>
-<<<<<<< HEAD
 #include <fstream>
 #include <ext/hash_map>
-=======
 #include <unordered_map>
->>>>>>> bcbbc24a8e808e0066cfc1eed55ff4464417d695
 #include <cstring>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -43,25 +40,19 @@ namespace __gnu_cxx {
 #define TRUE 1
 #define VERSION "0.2"
 
-<<<<<<< HEAD
 std::string device;
 int fd;
 ofstream logp;
-=======
 char *ans;
 std::string device;
 int fd, logp;
->>>>>>> bcbbc24a8e808e0066cfc1eed55ff4464417d695
 string version = VERSION;
 struct termios oldtio;
 hash_map<string, string> db;
 
 void signal_handler_IO(int);
-<<<<<<< HEAD
 void logdaemonevent(char*);
-=======
 void logdaemonevent(char*); 
->>>>>>> bcbbc24a8e808e0066cfc1eed55ff4464417d695
 
 void
 signal_handler_IO(int status) {
@@ -99,10 +90,6 @@ signal_handler_IO(int status) {
     ans = '4';
     goto error_condition;
   }
-<<<<<<< HEAD
-=======
-    
->>>>>>> bcbbc24a8e808e0066cfc1eed55ff4464417d695
 error_condition:
   if(strcmp(str, "3400C2DF0B22") == 0){ans='1';}//this is the admin key in case the database is destroyed or unavailable
     sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", str, ans);
@@ -113,19 +100,10 @@ error_condition:
 
 int
 load(int argc, char **argv) {
-<<<<<<< HEAD
   ifstream fp;
   std::string key;
   std::string value;
   std::string line;
-=======
-  FILE *fp;
-  char *str;
-  char buf[DBLINESIZE+1];
-  int h, collisioncnt;
-  char ans;
-  char logentry[256];
->>>>>>> bcbbc24a8e808e0066cfc1eed55ff4464417d695
 	
   fp.open("./db_real.txt");
   device = "/dev/ttyS0";
@@ -145,8 +123,6 @@ load(int argc, char **argv) {
   }
   else logdaemonevent("Unable to open database file"); 
 
-<<<<<<< HEAD
-=======
   while(fgets(buf, sizeof(buf), fp)) {
     if(*buf == '\n') continue;
     //this memory never gets freed and shouldn't
@@ -155,7 +131,6 @@ load(int argc, char **argv) {
     ans = buf[strlen(buf)-1];
   } 
   return fclose(fp);
->>>>>>> bcbbc24a8e808e0066cfc1eed55ff4464417d695
 }
 
 int
