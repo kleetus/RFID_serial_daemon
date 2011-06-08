@@ -41,12 +41,9 @@ namespace __gnu_cxx {
 #define VERSION "0.2"
 
 std::string device;
+string version = VERSION;
 int fd;
 ofstream logp;
-char *ans;
-std::string device;
-int fd, logp;
-string version = VERSION;
 struct termios oldtio;
 hash_map<string, string> db;
 
@@ -57,45 +54,20 @@ void logdaemonevent(char*);
 void
 signal_handler_IO(int status) {
   char buf[50];
-  char str[DBLINESIZE];
-  char logbuf[256];
-  int h,i,j;
-  char ans = '0';
-  char station_id = '0';
-  char ansstr[4];
-  
-  memset(logbuf, '\0', sizeof(logbuf));
-  memset(buf, '\0', sizeof(buf));
-  memset(str, '\0', sizeof(str));
-  
+  std::string cardid;
+  std::string ans;
+
   read(fd, buf, 50);
-  
+  cardid = (std::string)buf;
+    
   tcflush(fd, TCIFLUSH);
   
-  j=0;
-  for(i=0; j<DBLINESIZE; i++) {
-    if(buf[i]==3 || buf[i]==2 || buf[i]==10) { continue; }
-    if(i==2) { station_id = buf[i]; continue; }
-    str[j++] = buf[i];
-  }
-  
-  str[DBLINESIZE-1] = '\0';
-  
-  if(strlen(str) < DBLINESIZE-1) {
-    ans = '3'; 
-    goto error_condition;
-  }
- 
-  if(h >= TABLESIZE) {
-    ans = '4';
-    goto error_condition;
-  }
+  if(db.find(cardid) != db.end()) ans = db[cardid];
+  else ans = "5";
 error_condition:
-  if(strcmp(str, "3400C2DF0B22") == 0){ans='1';}//this is the admin key in case the database is destroyed or unavailable
-    sprintf(logbuf, "IO HANDLER -- received: %s +++ answered with: %c", str, ans);
-    logdaemonevent(logbuf);
-    sprintf(ansstr, "%c@%c", ans, station_id);
-    write(fd, ansstr, 3);
+  if(cardid.compare("3400C2DF0B22") == 0){ ans='1'; }
+    logdaemonevent("IO HANDLER -- received:" + cardid " +++ answered with: " +  ans);
+    write(fd, ans, 1);
   }
 
 int
@@ -121,16 +93,6 @@ load(int argc, char **argv) {
     }
     fp.close();
   }
-  else logdaemonevent("Unable to open database file"); 
-
-  while(fgets(buf, sizeof(buf), fp)) {
-    if(*buf == '\n') continue;
-    //this memory never gets freed and shouldn't
-    str = (char*)calloc(DBLINESIZE, sizeof(char));
-    strncpy(str, buf, strlen(buf)-1);
-    ans = buf[strlen(buf)-1];
-  } 
-  return fclose(fp);
 }
 
 int
