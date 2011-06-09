@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <ext/hash_map>
+#include <string>
 #include <unordered_map>
 #include <cstring>
 #include <sys/types.h>
