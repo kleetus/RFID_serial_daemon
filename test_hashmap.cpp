@@ -48,8 +48,7 @@ struct termios oldtio;
 hash_map<string, string> db;
 
 void signal_handler_IO(int);
-void logdaemonevent(char*);
-void logdaemonevent(char*); 
+void logdaemonevent(std::string);
 
 void
 signal_handler_IO(int status) {
@@ -65,13 +64,16 @@ signal_handler_IO(int status) {
   if(db.find(cardid) != db.end()) ans = db[cardid];
   else ans = "5";
 error_condition:
-  if(cardid.compare("3400C2DF0B22") == 0){ ans='1'; }
-    logdaemonevent("IO HANDLER -- received:" + cardid " +++ answered with: " +  ans);
-    write(fd, ans, 1);
-  }
+  if(cardid.compare("3400C2DF0B22") == 0){ ans="1"; }
+  cardid.insert(0,"IO HANDLER -- received:"); 
+  cardid.insert(cardid.length()-1, " +++ answered with: ");
+  cardid+=ans;
+  logdaemonevent(cardid);
+  write(fd, ans.c_str(), 1);
+}
 
 int
-load(int argc, char **argv) {
+load() {
   ifstream fp;
   std::string key;
   std::string value;
@@ -89,7 +91,10 @@ load(int argc, char **argv) {
       key = line.substr(0,line.length()-2);
       value = line.substr(line.length()-2, line.length()-1);
       db[key] = value;
-      logdaemonevent("[cardnum] - " << key << " - [answer] --" answer); 
+      key.insert(0, "[cardnum] - ");
+      key.insert(key.length()-1, " - [answer] --");
+      key+=value; 
+      logdaemonevent(key); 
     }
     fp.close();
   }
@@ -133,7 +138,7 @@ cleanup(int sig) {
   (void) signal(SIGINT, SIG_DFL);
 }
 
-int main(int argc, char **argv){
+int main(){
   struct termios newtio;
   struct sigaction saio;
   pid_t pid, sid;
@@ -143,46 +148,43 @@ int main(int argc, char **argv){
 
   char logentry[256];
 	
-  opendaemonlog(); //this could make the app fail if there is no log file, watch stdout
+  opendaemonlog(); 
 	
-  load(argc, argv);
+  load();
   
   dumpdatabase();
 	
   pid = fork();
    
-  if(pid < 0) {	logdaemonevent((char *)"failed to fork daemon event handler process."); exit(EXIT_FAILURE); }
-  if(pid > 0) {	logdaemonevent((char *)"forked daemon event handler process."); exit(EXIT_SUCCESS); }
+  if(pid < 0) {	logdaemonevent("failed to fork daemon event handler process."); exit(EXIT_FAILURE); }
+  if(pid > 0) {	logdaemonevent("forked daemon event handler process."); exit(EXIT_SUCCESS); }
   
   umask(0);
    
   sid = setsid();
-  if (sid < 0) { logdaemonevent((char *)"sid of daemon event handler less than 0."); exit(EXIT_FAILURE);}
-  if((chdir("/")) < 0) { logdaemonevent((char *)"daemon event handler: could not chdir to /."); exit(EXIT_FAILURE);}
+  if (sid < 0) { logdaemonevent("sid of daemon event handler less than 0."); exit(EXIT_FAILURE);}
+  if((chdir("/")) < 0) { logdaemonevent("daemon event handler: could not chdir to /."); exit(EXIT_FAILURE);}
    
   close(STDIN_FILENO); close(STDOUT_FILENO); close(STDERR_FILENO);
    
-  /* open the device to be non-blocking (read will return immediately) */
   fd = open(device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
-  if(fd<0) { logdaemonevent((char *)"failed to open serial device."); perror(device.c_str()); exit(EXIT_FAILURE); }
+  if(fd<0) { logdaemonevent("failed to open serial device."); perror(device.c_str()); exit(EXIT_FAILURE); }
   
-  /* install the signal handler before making the device asynchronous */
   saio.sa_handler = signal_handler_IO;
   saio.sa_mask = st;
   saio.sa_flags = 0;
   saio.sa_restorer = NULL;
   sigaction(SIGIO,&saio,NULL);
   
-  /* allow the process to receive SIGIO */
   char buff[10];
   sprintf(buff, "pid of event handler: %i", getpid());
-  logdaemonevent(buff);
+  logdaemonevent("pid of event handler: " + getpid());
 	
   fcntl(fd, F_SETOWN, getpid());
   fcntl(fd, F_SETFL, FASYNC);
   
-  tcgetattr(fd,&oldtio); /* save current port settings */
-  /* set new port settings for canonical input processing */
+  tcgetattr(fd,&oldtio); 
+  
   newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
   newtio.c_iflag = IGNPAR | ICRNL;
   newtio.c_oflag = 0;
@@ -197,8 +199,6 @@ int main(int argc, char **argv){
   }   
 	
   exit(EXIT_SUCCESS);
-  hash_map<const char*, const char*> rfidcard;
-  //cout << "rfidcard hashval is: " << rfidcard["AAAAAAAAAA"] << endl;
   return 0;
 }
 
