@@ -69,7 +69,7 @@ error_condition:
   cardid.insert(0,"IO HANDLER -- received:"); 
   cardid.insert(cardid.length()-1, " +++ answered with: ");
   cardid+=ans;
-  //logdaemonevent(cardid);
+  logdaemonevent(cardid);
   write(fd, ans.c_str(), 1);
 }
 
@@ -103,7 +103,7 @@ load() {
 
 int
 opendaemonlog() {
-  logp.open("/var/log/rfid_daemon.log");
+  logp.open("/var/log/rfid_daemon.log", ios::app);
   if(!logp.is_open()) {
     cout << "failed to open log file: /var/log/rfid_daemon.log" << endl;
     exit(EXIT_FAILURE);
@@ -156,8 +156,6 @@ int main(){
   sigset_t st;
   
   (void) signal(SIGINT, cleanup);
-
-  char logentry[256];
 	
   opendaemonlog(); 
 	
@@ -166,7 +164,7 @@ int main(){
   dumpdatabase();
 	
   pid = fork();
-   
+  
   if(pid < 0) {	logdaemonevent("failed to fork daemon event handler process."); exit(EXIT_FAILURE); }
   if(pid > 0) {	logdaemonevent("forked daemon event handler process."); exit(EXIT_SUCCESS); }
   
@@ -177,8 +175,9 @@ int main(){
   if((chdir("/")) < 0) { logdaemonevent("daemon event handler: could not chdir to /."); exit(EXIT_FAILURE);}
    
   close(STDIN_FILENO); close(STDOUT_FILENO); close(STDERR_FILENO);
-   
+  
   fd = open(device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+  
   if(fd<0) { logdaemonevent("failed to open serial device."); perror(device.c_str()); exit(EXIT_FAILURE); }
   
   saio.sa_handler = signal_handler_IO;
@@ -187,9 +186,9 @@ int main(){
   saio.sa_restorer = NULL;
   sigaction(SIGIO,&saio,NULL);
   
-  char buff[10];
-  sprintf(buff, "pid of event handler: %i", getpid());
-  logdaemonevent("pid of event handler: " + getpid());
+  char buff[100];
+  sprintf(buff, "pid of event handler: %d", getpid());
+  logdaemonevent(buff);
 	
   fcntl(fd, F_SETOWN, getpid());
   fcntl(fd, F_SETFL, FASYNC);
