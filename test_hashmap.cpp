@@ -69,7 +69,7 @@ error_condition:
   cardid.insert(0,"IO HANDLER -- received:"); 
   cardid.insert(cardid.length()-1, " +++ answered with: ");
   cardid+=ans;
-  logdaemonevent(cardid);
+  //logdaemonevent(cardid);
   write(fd, ans.c_str(), 1);
 }
 
@@ -79,7 +79,7 @@ load() {
   std::string key;
   std::string value;
   std::string line;
-	
+  
   fp.open("./db_real.txt");
   device = "/dev/ttyS0";
   
@@ -89,11 +89,11 @@ load() {
     {
       getline(fp, line);
       if(line.length()<13) continue;
-      key = line.substr(0,line.length()-2);
-      value = line.substr(line.length()-2, line.length()-1);
+      key = line.substr(0,line.length());
+      value = line.substr(line.length()-1, line.length());
       db[key] = value;
       key.insert(0, "[cardnum] - ");
-      key.insert(key.length()-1, " - [answer] --");
+      key.insert(key.length(), " - [answer] -- ");
       key+=value; 
       logdaemonevent(key); 
     }
@@ -121,13 +121,23 @@ void
 logdaemonevent(std::string log) {
   time_t t = time(NULL);
   std::string logtime = (std::string)ctime(&t);
-  logp << logtime << " :::  " <<  log << endl;
+  logp << logtime.substr(0,logtime.length()-1) << " :::  " <<  log << endl;
 }
 
 int
 dumpdatabase() {
-  logdaemonevent((char *)"starting dump of db\n");
-  return 1;
+  std::string value; 
+  std::string key;
+  logdaemonevent("\n\nstarting dump of db");
+  for(hash_map<std::string, std::string>::iterator it=db.begin(); it!=db.end(); it++) {
+    key = (*it).first;
+    key.insert(key.length(), " => ");
+    value = (*it).second;
+    key+=value;
+    logdaemonevent(key);
+  }
+  logdaemonevent("\nending dump of db\n");
+  return 0;
 }
 
 void
