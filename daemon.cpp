@@ -129,7 +129,7 @@ int
 dumpdatabase() {
   std::string value; 
   std::string key;
-  logdaemonevent("\n\nstarting dump of db");
+  logdaemonevent("starting dump of db");
   for(hash_map<std::string, std::string>::iterator it=db.begin(); it!=db.end(); it++) {
     key = (*it).first;
     key.insert(key.length(), " => ");
@@ -137,7 +137,7 @@ dumpdatabase() {
     key+=value;
     logdaemonevent(key);
   }
-  logdaemonevent("\nending dump of db\n");
+  logdaemonevent("ending dump of db");
   return 0;
 }
 
@@ -162,7 +162,7 @@ int main(){
 	
   load();
   
-  dumpdatabase();
+  //dumpdatabase();
 	
   pid = fork();
   
