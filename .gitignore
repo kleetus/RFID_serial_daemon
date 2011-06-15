@@ -2,3 +2,5 @@
 daemon
 backuphost
 testinput
+db_real.txt
+remote_access.sh
