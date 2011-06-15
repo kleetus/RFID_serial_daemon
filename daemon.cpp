@@ -58,7 +58,10 @@ signal_handler_IO(int status) {
   std::string cardid;
   std::string ans;
 
+  memset(buf, 0, 50);
+  
   read(fd, buf, 50);
+
   cardid = (std::string)buf;
   cardid = cardid.substr(0,12);
  
