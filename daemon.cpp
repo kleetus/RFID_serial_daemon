@@ -58,17 +58,21 @@ signal_handler_IO(int status) {
   std::string cardid;
   std::string ans;
 
+  memset(buf, 0, 50);
+  
   read(fd, buf, 50);
+
   cardid = (std::string)buf;
-    
+  cardid = cardid.substr(0,12);
+ 
   tcflush(fd, TCIFLUSH);
   
   if(db.find(cardid) != db.end()) ans = db[cardid];
   else ans = "5";
 error_condition:
   if(cardid.compare("3400C2DF0B22") == 0){ ans="1"; }
-  cardid.insert(0,"IO HANDLER -- received:"); 
-  cardid.insert(cardid.length()-1, " +++ answered with: ");
+  cardid.insert(0,"IO HANDLER -- received: "); 
+  cardid.insert(cardid.length(), " +++ answered with: ");
   cardid += ans;
   logdaemonevent(cardid);
   write(fd, ans.c_str(), 1);
@@ -90,7 +94,7 @@ load() {
     {
       getline(fp, line);
       if(line.length()<DBLINESIZE) continue;
-      key = line.substr(0,line.length());
+      key = line.substr(0,line.length()-1);
       value = line.substr(line.length()-1, line.length());
       db[key] = value;
       key.insert(0, "[cardnum] - ");
