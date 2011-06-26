@@ -64,7 +64,7 @@ signal_handler_IO(int status) {
   read(fd, buf, 50);
 
   raw = (std::string)buf;
-  cardid = cardid.substr(1,13);
+  cardid = raw.substr(1,12);
  
   tcflush(fd, TCIFLUSH);
   
