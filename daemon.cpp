@@ -68,7 +68,7 @@ signal_handler_IO(int status) {
   cardid = raw.substr(1,12);
   
   //if we get a shorter string that the 12 characters we expect, then we should look through the keys
-  if(cardid.length() < 12) {
+  if(cardid.length() < 12 && cardid.length() > 4) {
     hash_map<string, string>::iterator p;
     for (p = db.begin(); p != db.end(); ++p) {
       if(RE2::PartialMatch(p->first, cardid)) { ans = db[p->first]; goto error_condition; }
