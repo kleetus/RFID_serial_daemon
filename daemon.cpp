@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <pty.h>
 #include <time.h>
+#include <re2/re2.h>
 
 using namespace std;
 using namespace __gnu_cxx;
@@ -65,7 +66,15 @@ signal_handler_IO(int status) {
 
   raw = (std::string)buf;
   cardid = raw.substr(1,12);
- 
+  
+  //if we get a shorter string that the 12 characters we expect, then we should look through the keys
+  if(cardid.length() < 12) {
+    hash_map<string, string>::iterator p;
+    for (p = db.begin(); p != db.end(); ++p) {
+      if(RE2::PartialMatch(p->first, cardid)) { ans = db[p->first]; goto error_condition; }
+    }
+  } 
+
   tcflush(fd, TCIFLUSH);
   
   if(db.find(cardid) != db.end()) ans = db[cardid];
