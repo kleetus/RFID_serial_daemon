@@ -68,10 +68,13 @@ signal_handler_IO(int status) {
   cardid = raw.substr(1,12);
   
   //if we get a shorter string that the 12 characters we expect, then we should look through the keys
-  if(cardid.length() < 12 && cardid.length() > 4) {
+  if(cardid.length() < 12 && cardid.length() > 5) {
     hash_map<string, string>::iterator p;
     for (p = db.begin(); p != db.end(); ++p) {
-      if(RE2::PartialMatch(p->first, cardid)) { ans = db[p->first]; goto error_condition; }
+      std::string matcher = raw.substr(1,raw.length()-2);
+      //this is dangerous
+      std::string key = p->first.substr(4, 8);
+      if(RE2::PartialMatch(key, matcher)) { ans = db[p->first]; goto error_condition; }
     }
   } 
 
@@ -96,7 +99,7 @@ load() {
   std::string line;
   
   fp.open("./db_real.txt");
-  device = "/dev/ttyS0";
+  device = "/dev/ttyUSB0";
   
   if (fp.is_open())
   {
