@@ -1,8 +1,8 @@
 CC=g++
 CFLAGS=-I.
-LIBS=-lutil -lre2
+LIBS=-lutil
 
-default: daemon.c
+default: daemon.cpp
 	$(CC) -o daemon daemon.cpp $(CFLAGS) $(LIBS) -Wno-deprecated -std=gnu++0x 
 clean:
-	rm -rf daemon testinput test_hashmap
+	rm -rf daemon 

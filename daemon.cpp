@@ -19,7 +19,6 @@
 #include <sys/types.h>
 #include <pty.h>
 #include <time.h>
-#include <re2/re2.h>
 
 using namespace std;
 using namespace __gnu_cxx;
@@ -39,9 +38,7 @@ namespace __gnu_cxx {
 #define BAUDRATE B9600
 #define DBLINESIZE 13
 #define _POSIX_SOURCE 1
-#define FALSE 0
-#define TRUE 1
-#define VERSION "0.2"
+#define VERSION "0.3"
 
 std::string device;
 string version = VERSION;
@@ -49,33 +46,75 @@ int fd;
 ofstream logp;
 struct termios oldtio;
 hash_map<string, string> db;
+int buf0_index = 0;
+int buf1_index = 0;
+int buf2_index = 0;
+
+char buf0[12];
+char buf1[12];
+char buf2[12];
 
 void signal_handler_IO(int);
 void logdaemonevent(std::string);
 
 void
 signal_handler_IO(int status) {
-  char buf[50];
+  char buf[2];
+  int index = 0;
+  int process = false;
   std::string raw;
   std::string cardid;
   std::string ans;
 
-  memset(buf, 0, 50);
+  memset(buf, 0, 2);
   
-  read(fd, buf, 50);
-
-  raw = (std::string)buf;
-  cardid = raw.substr(1,12);
+  read(fd, buf, 2);
   
-  //if we get a shorter string that the 12 characters we expect, then we should look through the keys
-  if(cardid.length() < 12 && cardid.length() > 4) {
-    hash_map<string, string>::iterator p;
-    for (p = db.begin(); p != db.end(); ++p) {
-      if(RE2::PartialMatch(p->first, cardid)) { ans = db[p->first]; goto error_condition; }
+  if(buf[1] == 10){
+    switch(buf[0]){
+      case 33: 
+        cardid = (std::string)buf0;
+        buf0_index = 0;
+        process = true;
+        memset(buf0, 0, 12);
+        break;
+      case 34:
+        cardid = (std::string)buf1;
+        buf1_index = 0;
+        process = true;
+        memset(buf1, 0, 12);
+        break;
+      case 35:
+        cardid = (std::string)buf2;
+        buf2_index = 0;
+        process = true;
+        memset(buf2, 0, 12);
+        break;
     }
-  } 
-
+  }
+  else{
+    switch(buf[0]){
+      case 33:
+        if(buf0_index<12){
+          buf0[buf0_index++] = buf[1];
+        }
+        break;
+      case 34:
+        if(buf1_index<12){
+          buf1[buf1_index++] = buf[1];
+        }
+        break;
+      case 35:
+        if(buf2_index<12){
+          buf2[buf2_index++] = buf[1];
+        }
+        break;
+    }
+  }
+ 
   tcflush(fd, TCIFLUSH);
+  
+  if(!process) return; 
   
   if(db.find(cardid) != db.end()) ans = db[cardid];
   else ans = "5";
@@ -96,7 +135,7 @@ load() {
   std::string line;
   
   fp.open("./db_real.txt");
-  device = "/dev/ttyS0";
+  device = "/dev/ttyUSB0";
   
   if (fp.is_open())
   {
