@@ -25,12 +25,15 @@ class Daemon
     stop_bits = 1
     parity = SerialPort::NONE
     @port = SerialPort.new(port_str, baud_rate, data_bits, stop_bits, parity)
+    @port.read_timeout=80;
   end
   
   def listen_and_respond
-    query = @port.readline.rstrip
-    @port.write(@db.has_key?(query) ? @db[query] : '0')
-    puts "#{Time.now.strftime("%Y-%m-%d %H:%M:%S")} ::: query: #{query} ::: answered with: #{@db.has_key?(query) ? @db[query] : '0'}"
+    query = @port.read(6)
+    if query and query != 0
+      @port.write((@db.has_key?(query) ? @db[query] : '0'))
+      puts "#{Time.now.strftime("%Y-%m-%d %H:%M:%S")} ::: query: #{query} ::: answered with: #{@db.has_key?(query) ? @db[query] : '0'}"
+    end
   end
 
 end
@@ -41,6 +44,9 @@ daemon.open_serial_port
 
 loop do
   daemon.listen_and_respond
+  #daemon.port.write("1")
+  #puts "writing"
+  #sleep 1
 end
 
 daemon.port.close
