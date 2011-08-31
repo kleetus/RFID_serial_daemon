@@ -10,7 +10,7 @@ class Daemon
   end
 
   def load_db
-    db_file = open('/home/kleetus/RFID_serial_daemon/db_real.txt') 
+    db_file = open('/root/RFID_serial_daemon/db_real.txt') 
     db_file.each_line do |l| 
       f = l.rstrip
       @db[f[6..-2]] = f[-1..-1]
